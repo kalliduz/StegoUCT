@@ -41,7 +41,7 @@ where
  The current state of this projects implements both of these strategies.
  It has an estimated rank of 3kyu to 1dan, based on ManyFacesOfGo rating) on 9x9 board when playing with 10 seconds per move.
  On 19x19 it can still be considered a beginner player, even when giving around 2 minutes per move, it only achives around
- 15kyu to 20kyu playing strength. This is mostly because of a missing implementation of a good AMAF algorithm (see Issue #2 for reference)
+ 15kyu to 20kyu playing strength. This is mostly because of a missing implementation of a good AMAF algorithm (see https://github.com/kalliduz/StegoUCT/issues/2 for reference)
  
  
  
