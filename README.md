@@ -21,15 +21,15 @@ UCT stands for "Upper Confidence Tree".
 It defines a balance between recursive minimax strategy and montecarlo winratio refinement.
 It is represented by the following formula:
 
-(wi/ni) + c*sqrt(ln(Ni)/ni)
+**(wi/ni) + c*sqrt(ln(Ni)/ni)** 
 
 where 
 
- wi ... number of wins for the node considered after the i-th move
- ni ... number of simulations for the node after the i-th move
- Ni ... number of total simulations after i-th move
- c  ... exploration parameter
- ln ... the logarithmus naturalis function
+ * **wi** number of wins for the node considered after the i-th move <br> 
+ * **ni** number of simulations for the node after the i-th move <br>
+ * **Ni** number of total simulations after i-th move <br> 
+ * **c**  exploration parameter <br> 
+ * **ln** the logarithmus naturalis function <br>
  
  (wi/ni) is the winrate of the node, let's call it the exploitation factor
  c*sqr(ln(Ni)/ni) is a part that grows, when the number of simulations on this node is small, we call it the exploration factor
