@@ -33,6 +33,7 @@ TGameManager=class
     FAssignedInfoDisplay:TImage;
 
     FDisplayRating:Boolean;
+    FDisplayRatingOverlay:Boolean;
     FGTpMode:Boolean;
 
     FLastPlayOuts:Int64;
@@ -300,7 +301,7 @@ implementation
       (((FBoard.PlayerOnTurn=1)AND FGameStatus.CompWhite)OR
       ((FBoard.PlayerOnTurn=2)AND FGameStatus.CompBlack))
     then
-
+    if FDisplayRatingOverlay then
     begin
       RatingTable:=FUCT.GetRatingtable;
       PaintRatingOverlay(FAssignedMainDisplay,BOARD_SIZE,@RatingTable,False);
@@ -341,6 +342,7 @@ implementation
   begin
     FGTPMode:=True;
     FDisplayRating:=True;
+    FDisplayRatingOverlay:=False;
     FDisplayTimer:=TTimer.Create(nil);
     FDisplayTimer.Interval:=100;
     FDisplayTimer.OnTimer:=OnDisplayTimer;

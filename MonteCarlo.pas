@@ -4,7 +4,7 @@ interface
 uses DataTypes,BoardControls,SysUtils;
   const
   Directions : array [1..8,1..2] of SmallInt =((1,0),(1,1),(1,-1),(0,1),(0,-1),(-1,0),(-1,1),(-1,-1));
-  function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double;var AAMAFList:TAMAFList):SmallInt;
+  function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double):SmallInt;
 
 // TODO:
 // - Optimize CleanMoveList and compare to GetMoveList (error if not equal)
@@ -15,7 +15,7 @@ uses DataTypes,BoardControls,SysUtils;
 implementation
 
 
- function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double;var AAMAFList:TAMAFList):SmallInt;
+ function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double):SmallInt;
  var i:integer;ldoneCount,lValCount:Integer;valid:array[1..8]of Boolean;notMovedFor,movC:Int64;lx,ly,x,y:SmallInt;superKoTrouble:Integer;hasmoved:Boolean; movesB,movesW:TMoveList;len,rnd:Integer;StonesOnBoard:SmallInt;
  begin
   // randomize;
@@ -93,13 +93,7 @@ implementation
            end;
         //  if IsReasonableMove(x,y,APSimBoard,APSimBoard.PlayerOnTurn) then
 
-         if AAMAFList.MoveCount<=MAX_AMAF_MOVES then
-          begin
-            AAMAFList.Moves[AAMAFList.MoveCount].Color:=APSImBoard.PlayerOnTurn;
-            AAMAFList.Moves[AAMAFList.MoveCount].X:=x;
-            AAMAFList.Moves[AAMAFList.MoveCount].Y:=y;
-            inc(AAMAFList.MoveCount);
-          end;
+
 
                     //-------CAPTURE GO APPENDIX---------------
            { if APSimBoard.RemovedStones[2]>0 then

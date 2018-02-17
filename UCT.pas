@@ -2,44 +2,7 @@ unit UCT;
 
 interface
   uses DataTypes,BoardControls,Windows,SyncObjs;
-  //TODO:
-  //- implement simple heuristics
-  // UpperConfidenceFactor = Winrate*EXPLORATION_FACTOR*sqrt( ln(NodePlys)/XYPlys)
-//                          * getHeuristicAt(x,y,Anode.Board) ---> implement pattern search and convert into an UCT-Term
-//Implement Debug-Mode:
-//    -->Possibility to display every node-board incl. ratingtable
 
- //TODO: Implement Create from SubNode!
-
- //TODO: IMplement Atari-Heuristc!!  (see remi coulom papers)
- //       -->Problem here: after atari most likely a forcing move, so tree search underestimates the true winrate when ignoring
-//                                                                      (high exploration constant makes it worse)
-
- //TODO: IMPLEMENT PASSING MOVES!!! --> until weekend
-
- //TODO: Implement FastMath for logarithm and root approximations
-
- //   REWORK MEMORY STRUCTURE! (Board needed for every node(maybe ExecuteMove if GetBoard is called?)
- //             -->NOW: 2GB Memory after 20 seconds full-strength playout
-//              --> Implement MAX_TREE_MEMORY_SIZE  (DONE)
-//                    -->Cut less promising branches if memory get too high? Think!
-
-//TODO: Synchronize ALL GETTER AND SETTER TO MAKE THEM THREADSAFE!!
-//        --> USE THEM ALSO FOR INTERNAL CALCULATIONS!(inline if possible)
-
-//TODO: Atari Heuristics->
-//     Escapes Atari? Generates Self-Atari? Brings opponent in atari?
-
-//TODO: Local Value Tables:
-//  at what rate the move has still the same color in monte-end-position?
-//  1/3*StillOwnStone+ Sum(1/6 of neighbour =ownstone)
-//
-//
-//
-//
-////
-///  AMAF --> All moves as first
-///  if you see move x,y update all nodes, that also made x,y
   const
   MIN_TREE_WIDTH = 1;
   type
@@ -51,8 +14,6 @@ interface
 
     TTreeNode = record
       RatingTable:PRatingTable;
-      AMAFRatingTable:PRatingTable;
-      AMAFPlayouts:Int64;
       Board:PBoard;
       ExplorationList:PExplorationList;
       HeuristicTable:PHeuristicTable;
@@ -80,8 +41,7 @@ interface
         constructor Create(ABoard:TBoard);
         destructor Destroy;override;
         function AddExploreNode(AParentNode:PTreeNode;AMoveX,AMoveY:SmallInt;var Success:Boolean):PTreeNode;
-        function AddPlayOutsToNode(ANode:PTreeNode;AMoveX,AMoveY:SmallInt;AWinsWhite,AWinsBlack:Integer;AIsAMAFUpdate:Boolean;AAMAFList:TAMAFList):Boolean;
-        procedure AMAFUpdatePlayouts(ANode:PTreeNode;AAMAFList:TAMAFList;WinsWhite,WinsBlack:Integer);
+        function AddPlayOutsToNode(ANode:PTreeNode;AMoveX,AMoveY:SmallInt;AWinsWhite,AWinsBlack:Integer):Boolean;
         function GetCurrentBest(ANode:PTreeNode;var MoveX:SmallInt;var MoveY:SmallInt):Boolean;
         function IsValid(X,Y:SmallInt;Node:PTreeNode):Boolean;
         function GetChildAt(X,Y:SmallInt;ANode:PTreeNode;out ChildNode:PTreeNode):Boolean;
@@ -96,7 +56,6 @@ interface
         procedure GetMostPlayed(ANode:PTreeNode;var X:SmallInt;var Y:SmallInt);
         procedure GetBestExploitationNode(ANode:PTreeNode;var X:SmallInt;var Y:SmallInt);
         function GetRatingtable:TRatingTable;
-        function GetAMAFRatingTable:TRatingTable;
         function SetNewRoot(ANewRootNode:PTreeNode):Boolean;
         procedure FreeTree(AStartNode:PTreeNode; APreserveNewRoot:Boolean;ANewRootNode:PTreeNode);
         function GetMemAllocSize:Int64;inline; //in Bytes
@@ -111,8 +70,6 @@ uses Math;
  function TUCT.GetUpperConfidenceFactor(ANode:PTreeNode;ax,ay:SmallInt):Double;
   var PlayOutsXY:Int64;
       Wins:Int64;
-      PlayOutsXYAMAF:Int64;
-      WinsAMAF:Int64;
       RaveBeta:Double;
       UCRave:Double;
       UCNormal:Double;
@@ -122,32 +79,18 @@ uses Math;
     if ANode.Board.PlayerOnTurn = 1  then Wins:=Anode.RatingTable.RatingAt[ax,ay].WinsWhite else
     Wins:=Anode.RatingTable.RatingAt[ax,ay].WinsBlack;
 
-    if ANode.Board.PlayerOnTurn = 1 then WinsAMAF:=ANode.AMAFRatingTable.RatingAt[ax,ay].WinsWhite else
-    WinsAMAF:=ANode.AMAFRatingTable.RatingAt[ax,ay].WinsBlack;
+
 
     PlayOutsXY:=ANode.RatingTable.RatingAt[ax][ay].WinsBlack+ ANode.RatingTable.RatingAt[ax][ay].WinsWhite;
-    PlayOutsXYAMAF:=ANode.AMAFRatingTable.RatingAt[ax,ay].WinsWhite+ANode.AMAFRatingTable.RatingAt[ax,ay].WinsBlack;
 
-    if PlayOutsXYAMAF=0 then
-    begin
-      Result:=ANode.AMAFPlayouts;
-      Exit;
-    end;
 
     if PlayOutsXY=0 then
     begin
-      if ANode.ChildCount<MIN_TREE_WIDTH then
-      begin
-        Result:=WinsAMAF/PlayOutsXYAMAF*1000; // explore highest amaf-ratings first
-      end else Result:=WinsAMAF/PlayOutsXYAMAF/1000; //only explore
-      //Exit;
+
+     Result:=10000000;
     end else
     begin
-       UCRave:=((WinsAMAF/PlayOutsXYAMAF))/AMAF_WIN_REDUCTION_FACTOR;//+
 
-             // (0.2)*
-            //  sqrt(ln(ANode.AMAFPlayouts)/PlayOutsXYAMAF))/AMAF_WIN_REDUCTION_FACTOR;
-//       UCRave:=0;
        UCNormal:=( Wins/PlayOutsXY)+  //winrate for player on turn
           (Max(EXPLORATION_FACTOR_START-(ANode.Depth*EXPLORATION_FACTOR_STEP),EXPLORATION_FACTOR_END))*
               //the deeper we get, the less broadened will be the tree
@@ -158,45 +101,13 @@ uses Math;
       try
          Result:= UCRave+UCNormal+Heuristic;
 
-
-          //AMAF_FACTOR!
       except
         Result:=10000;
       end;
     end;
 
   end;
-procedure TUCT.AMAFUpdatePlayouts(ANode:PTreeNode;AAMAFList:TAMAFList;WinsWhite,WinsBlack:Integer);
-var i,j:Integer;
-begin
 
-     for i  := 1 to AAMAFList.MoveCount-1 do
-     begin
-     //  if Assigned(ANode.ExplorationList[AAMAFList.Moves[i].X,AAMAFList.Moves[i].Y]) then
-       begin
-         if ANode.Board.PlayerOnTurn=AAMAFList.Moves[i].Color then
-
-         begin
-           AddPlayOutsToNode(ANode,AAMAFList.Moves[i].X,AAMAFList.Moves[i].Y,WinsWhite,WinsBlack,True,AAMAFList)
-         end;
-       end;
-
-     end;
-
-    {  if Assigned(ACurNode.ExplorationList[AMoveX,AMoveY]) then  if ACurNode.ParentPointer=FPRootNode then
-
-      begin
-        if (ACurNode.Board.PlayerOnTurn = APlayersMove) then //If AMAF-Move Found
-        begin
-          AddPlayOutsToNode(ACurNode,AMoveX,AMoveY,AWinsWhite,AWinsBlack,True);
-        end;
-         AMAFUpdatePlayouts(ACurNode.ParentPointer,AMoveX,AMoveY,AWinsWhite,AWinsBlack,APlayersMove);
-
-
-      end;        }
-
-
-end;
 function TUCT.PruneTree:Boolean;
 var LChild:PTreeNode;
 begin
@@ -301,8 +212,6 @@ end;
   AStartNode.ExplorationList:=nil;
   Dispose(AStartNode.HeuristicTable);
   AStartNode.HeuristicTable:=nil;
-  Dispose(AStartNode.AMAFRatingTable);
-  AStartNode.AMAFRatingTable:=nil;
   Dispose(AStartNode);
   AStartNode:=Nil;
   FMaxMemReached:=False;
@@ -391,10 +300,7 @@ begin
     end;
   end;
 end;
-function TUCT.GetAMAFRatingTable:TRatingTable;
-begin
-  result :=FPRootNode.AMAFRatingTable^;
-end;
+
 function TUCT.GetRatingtable:TRatingTable;
 begin
   result := FPRootNode.RatingTable^;
@@ -503,7 +409,7 @@ end;
 
     end;
   end;
-  function TUCT.AddPlayOutsToNode(ANode:PTreeNode;AMoveX,AMoveY:SmallInt;AWinsWhite,AWinsBlack:Integer;AIsAMAFUpdate:Boolean;AAMAFList:TAMAFList):Boolean;
+  function TUCT.AddPlayOutsToNode(ANode:PTreeNode;AMoveX,AMoveY:SmallInt;AWinsWhite,AWinsBlack:Integer):Boolean;
   begin
    //while FThreadLockDestroyNode do sleep(0);
     Result:=False;
@@ -511,22 +417,11 @@ end;
     if not Assigned(ANode) then Exit;
      if not Assigned(ANode.RatingTable) then Exit;
 
-    if not AIsAMAFUpdate then
-    begin
       inc(ANode.PlayOuts,AWinsWhite+AWinsBlack);
       Inc(ANode.RatingTable.RatingAt[AMoveX][AMoveY].WinsWhite,AWinsWhite);
       Inc(ANode.RatingTable.RatingAt[AMoveX][AMoveY].WinsBlack,AWinsBlack);
-    end else
-    begin
-      Inc(ANode.AMAFPlayOuts,AWinsWhite+AWinsBlack);
-      Inc(ANode.AMAFRatingTable.RatingAt[AMoveX][AMoveY].WinsWhite,AWinsWhite);
-      Inc(ANode.AMAFRatingTable.RatingAt[AMoveX][AMoveY].WinsBlack,AWinsBlack);
-    end;
-   if not AIsAMAFUpdate then AddPlayOutsToNode(ANode.ParentPointer,ANode.MyMoveX,ANode.MyMoveY,AWinsWhite,AWinsBlack,False,AAMAFList);    //Backpropagate the winrate!
-     if not AIsAMAFUpdate then  //Update Siblings (moves with same X,Y in the whole path
-     begin
-      AMAFUpdatePlayouts(ANode,AAMAFList,AWinsWhite,AWinsBlack);
-     end;
+
+   AddPlayOutsToNode(ANode.ParentPointer,ANode.MyMoveX,ANode.MyMoveY,AWinsWhite,AWinsBlack);    //Backpropagate the winrate!
 
      Result := True;
 
@@ -580,7 +475,6 @@ end;
       Result.IsSettled:=False;
       New(Result.Board);
       New(Result.RatingTable);
-      New(Result.AMAFRatingTable);
       New(Result.ExplorationList);
       New(Result.HeuristicTable);
 
@@ -596,7 +490,6 @@ end;
       if Result.Depth>FMaxDepth then FMaxDepth:=Result.Depth;
       ExecuteMove(AMoveX,AMoveY,Result.Board.PlayerOnTurn,Result.Board,False,True,dummy1,dummy2);
       ResetRatingTable(Result.RatingTable,Result.Board);
-      ResetRatingTable(Result.AMAFRatingTable,Result.Board);
       ResetExplorationList(Result.ExplorationList);
       Result.MyMoveX:=AMoveX;// set the move that created this position
       Result.MyMoveY:=AMoveY;
@@ -643,7 +536,6 @@ end;
     New(FPRootNode);
     New(FPRootNode.Board);
     New(FPRootNode.RatingTable);
-    New(FPRootNode.AMAFRatingTable);
     New(FProotNode.ExplorationList);
     New(FPRootNode.HeuristicTable);
     FPRootNode.ChildCount:=0;
@@ -655,7 +547,6 @@ end;
     FPRootNode.Depth:=0;
     FPRootNode.PlayOuts:=0;
     ResetRatingTable(FProotNode.RatingTable,FPRootNode.Board);
-    ResetRatingTable(FPROotNode.AMAFRatingTable,FPRootNode.Board);
     ResetExplorationList(FPRootNode.ExplorationList);
     FPRootNode.IsSettled:=True;
    end;
