@@ -1,7 +1,7 @@
 unit GameControl;
 
 interface
-uses DataTypes,Dialogs,UCT,UCTThread,BoardControls,Display,ExtCtrls,DateUtils,SysUtils;
+uses DataTypes,Dialogs,UCTreeThread,UCTree,BoardControls,Display,ExtCtrls,DateUtils,SysUtils;
 
 type
 TTimeSetting=record
@@ -21,8 +21,7 @@ end;
 TGameManager=class
   private
     FBoard:TBoard;
-    FUCT:TUct;
-    FThinkThreads:array[0..MC_MAX_THREADS-1]of TUCTThread;
+    FThinkThread:TUCTreeThread;
 
     FDisplayTimer:TTimer;
     FThinkTimer:TTimer;
@@ -40,6 +39,8 @@ TGameManager=class
     procedure OnDisplayTimer(Sender:TObject);
     procedure OnThinkTimer(Sender:TObject);
     procedure StopThreads;
+    procedure DestroyThreads;
+    procedure CreateThreads;
     procedure StartThreads; //expects clean and closed threads
     procedure UseOldUCTAt(AX,AY:SmallInt);
     procedure NewUCT;
@@ -64,6 +65,15 @@ TGameManager=class
 end;
 
 implementation
+    procedure TGameManager.DestroyThreads;
+    begin
+      FThinkThread.Free;
+      FThinkThread:=nil;
+    end;
+    procedure TGameManager.CreateThreads;
+    begin
+      FThinkThread:=TUCTreeThread.Create(FBoard);
+    end;
   procedure TGameManager.SetInfoDisplay(ADisplay:TImage);
   begin
     FAssignedInfoDisplay:=ADisplay;
@@ -71,8 +81,10 @@ implementation
   function TGameManager.ShouldResign:Boolean;
   var wr:double;bx,by:SMallInt;
   begin
-    FUCT.GetCurrentBest(FUCT.RootNode,bx,by);
-    wr:=FUCT.WinrateAt(FUCT.RootNode,bx,by);
+    //FUCT.GetCurrentBest(FUCT.RootNode,bx,by);
+    bx:= FThinkThread.BestX;
+    by:= FThinkThread.BestY;
+    wr:=FThinkThread.Winrate;
     Result:=False;
     if FBoard.PlayerOnTurn=1 then if wr< RESIGN_TRESHOLD then Result:=True;
     if FBoard.PlayerOnTurn=2 then if wr>(1-RESIGN_TRESHOLD) then Result:=True;
@@ -82,7 +94,7 @@ implementation
     FDisplayTimer.Free;
     FThinkTimer.Free;
     StopThreads;
-    FUCT.Free;
+    FThinkThread.Destroy;
     inherited Destroy;
   end;
   procedure TGameManager.GetLastMove(var X:SmallInt;var Y:SmallInt);
@@ -182,7 +194,7 @@ implementation
   procedure TGameManager.MoveNow(X,Y:SmallInt);
   var dummy1,dummy2:TMoveList;
   begin
-    StopThreads;
+    DestroyThreads;
     ExecuteMove(X,Y,
                 FBoard.PlayerOnTurn,
                 @FBoard,
@@ -192,17 +204,16 @@ implementation
                 );
     CalculateNewTime;
     UseOldUCTAt(X,Y);
-    StartThreads;
+    CreateThreads;
   end;
   procedure TGameManager.ComputerMoveNow;
   var x,y:SmallInt;dummy1,dummy2:TMoveList;
   begin
 
-    if not Assigned(FUCT) then Exit;
+    if not Assigned(FThinkThread) then Exit;
     StopThreads;
-    FUCT.GetMostPlayed(FUCT.RootNode,X,Y);
     if FBoard.LastPlayerPassed then
-      ExecuteMove(X,Y,
+      ExecuteMove(FThinkThread.BestX,FThinkThread.BestY,
                   FBoard.PlayerOnTurn,
                   @FBoard,
                   true, //passmove criterium
@@ -227,69 +238,51 @@ implementation
   end;
   procedure TGameManager.NewUCT;
   begin
-    if Assigned(FUCT) then FUCT.Destroy;
-    FUCT:=TUCT.Create(FBoard);
+    if Assigned(FThinkThread) then FThinkThread.Destroy;
+    FThinkThread:=TUCTreeThread.Create(FBoard);
   end;
   procedure TGameManager.UseOldUCTAt(AX,AY:SmallInt);
-  var Child:PTreeNode;
   begin
-  Child:=nil;
-   if Assigned(FUCT) then
-   begin
-    if FUCT.GetChildAt(AX,AY,FUCT.RootNode,child) then
-    FUCT.SetNewRoot(child) else
-    begin //if child wasn't thought
-      FUCT.Free;
-      FUCT:=TUCT.Create(FBoard);
-    end;
-   end else FUCT:=TUCT.Create(FBoard);
+    raise Exception.Create('Not implemented anymore');
   end;
 
   procedure TGameManager.StartThreads;
   var i:integer;
   begin
-     for i := 0 to MC_MAX_THREADS-1 do FThinkThreads[i]:=TUCTThread.Create(@FUCT);
+     FThinkThread.Resume;
   end;
 
   procedure TGameManager.StopThreads;
   var i:integer;
   begin
-    for i := 0 to MC_MAX_THREADS-1 do
-    begin
-      if Assigned(FThinkThreads[i]) then
-      begin
-            FThinkThreads[i].FreeOnTerminate:=false;
-            FThinkThreads[i].KillFlag:=True;
-            FThinkThreads[i].Free;
-            FThinkThreads[i]:=nil;
-      end;
-    end;
+    if Assigned(FThinkThread) then
+      FThinkThread.Suspend;
   end;
 
   procedure TGameManager.OnDisplayTimer(Sender:TObject);
-  var RatingTable:TRatingTable;X,Y:SmallInt; tmp:Int64; gameInfo:TGameInformation;  child:PTreeNode;
+  var
+    X,Y:SmallInt;
+    tmp:Int64;
+    gameInfo:TGameInformation;
   begin
     //GENERATE GAME INFOS
-    child:=nil;
-    if Assigned(FUCT) then
+//    child:=nil;
+    if Assigned(FThinkThread) then
     begin
       X:=0;Y:=0;
-      tmp:=FUCT.GetPlayOutCount;
+      tmp:=FThinkThread.AllPlayouts;
       gameInfo.PlyPerSec:=round((tmp-FLastPlayouts)*(1000/FDisplayTimer.Interval));
       FLastPlayOuts:=tmp;
-      gameInfo.MemoryUsed:=FUCT.GetMemAllocSize;
+      gameInfo.MemoryUsed:=0; //TODO:Implement
       gameInfo.MaxMemory:=MAX_MEMORY;
-      gameInfo.NodeCount:=FUCT.NodeCount;
-      FUCT.GetMostPlayed(FUCT.RootNode,X,Y);
-      gameInfo.BestMoveX:=X;
-      gameInfo.BestMoveY:=Y;
-      gameInfo.BestMoveWinrate:=FUCT.WinrateAt(FUCT.RootNode,X,Y);
-      FUCT.GetChildAt(x,y,FUCT.RootNode,Child);
-      FUCT.GetMostPlayed(Child,X,y);
-      gameInfo.BestResponseX:=X;
-      gameInfo.BestResponseY:=Y;
+      gameInfo.NodeCount:=FThinkThread.NodeCount;
+      gameInfo.BestMoveX:=FThinkThread.BestX;
+      gameInfo.BestMoveY:=FThinkThread.BestY;
+      gameInfo.BestMoveWinrate:=FThinkThread.Winrate;
+      gameInfo.BestResponseX:=-1;
+      gameInfo.BestResponseY:=-1; //TODO Implement
 
-      gameInfo.BestResponseWinrate:=FUCT.WinrateAt(Child,x,y);
+      gameInfo.BestResponseWinrate:=-1; //TODO Implement
 
       if Assigned(FAssignedInfoDisplay) then
         DisplayGameInformation(gameInfo,FAssignedInfoDisplay);
@@ -297,21 +290,23 @@ implementation
     //-------------------
     if not Assigned(FAssignedMainDisplay) then Exit;
     PaintEmptyBoard(FAssignedMainDisplay,BOARD_SIZE);
-    if FDisplayRating then if Assigned(FUCT) then if
+    if FDisplayRating then if Assigned(FThinkThread) then if
       (((FBoard.PlayerOnTurn=1)AND FGameStatus.CompWhite)OR
       ((FBoard.PlayerOnTurn=2)AND FGameStatus.CompBlack))
     then
     if FDisplayRatingOverlay then
     begin
-      RatingTable:=FUCT.GetRatingtable;
-      PaintRatingOverlay(FAssignedMainDisplay,BOARD_SIZE,@RatingTable,False);
+     // RatingTable:=FUCT.GetRatingtable;
+     // PaintRatingOverlay(FAssignedMainDisplay,BOARD_SIZE,@RatingTable,False);
+     //TODo Implement
     end;
     PaintOccupation(FAssignedMainDisplay,BOARD_SIZE,@FBoard);
-    if Assigned(FAssignedWinRateDisplay) then if Assigned(FUCT) then
 
+    if Assigned(FAssignedWinRateDisplay) then if Assigned(FThinkThread) then
     begin
-     FUCT.GetMostPlayed(FUCT.RootNode,x,y);
-     PaintWinrateBar(FAssignedWinRateDisplay,FUCT.WinrateAt(FUCT.RootNode,x,y));
+      //TODO: IMplement
+    // FUCT.GetMostPlayed(FUCT.RootNode,x,y);
+    // PaintWinrateBar(FAssignedWinRateDisplay,FUCT.WinrateAt(FUCT.RootNode,x,y));
     end;
 
   end;
@@ -321,8 +316,8 @@ implementation
   begin
     StopThreads;
     ResetBoard(@FBoard);
-    if Assigned(FUCT) then FreeAndNil(FUCT);
-    FUCT:=TUct.Create(FBoard);
+    if Assigned(FThinkThread) then FreeAndNil(FThinkThread);
+    FThinkThread:=TUCTreeThread.Create(FBoard);
     FGameStatus.TimeWhite.MainTime:=AMainTimeWhite;
     FGameStatus.TimeWhite.ByoLength:=AByoTime;
     FGameStatus.TimeWhite.ByoPeriods:=AByoPeriods;
@@ -343,6 +338,7 @@ implementation
     FGTPMode:=True;
     FDisplayRating:=True;
     FDisplayRatingOverlay:=False;
+    FThinkThread:=nil;
     FDisplayTimer:=TTimer.Create(nil);
     FDisplayTimer.Interval:=100;
     FDisplayTimer.OnTimer:=OnDisplayTimer;

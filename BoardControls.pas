@@ -128,6 +128,7 @@ uses Math;
       APRatingTable.RatingPass.WinsWhite:=0;
       APRatingTable.RatingPass.WinsBlack:=0;
     end;
+
     procedure CleanMoveList(APBoard:PBoard;AColor:SmallInt; MoveList:PMoveList);
     var i:Integer;len:Integer;
     begin
@@ -145,6 +146,7 @@ uses Math;
           Inc(i);
       end;
     end;
+
     function HasLiberties(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean;
     var memFlag:SmallInt;i,j:Integer;
     begin
