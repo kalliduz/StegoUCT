@@ -1,5 +1,5 @@
 # StegoUCT
-Simple Go Engine using MonteCarlo and UCT written in Delphi. GTP compatible. AI Heuristics planned
+Simple Go Engine using MonteCarlo,UCT and AMAF/RAVE written in Delphi. GTP compatible. AI Heuristics planned
 
 What is MonteCarlo?
 -------------------
@@ -18,7 +18,7 @@ What is UCT?
 ------------
 
 UCT stands for "Upper Confidence Tree".
-It defines a balance between recursive minimax strategy and montecarlo winratio refinement.
+It defines a tree using the balance between recursive minimax strategy and montecarlo winratio refinement.
 It is represented by the following formula:
 
 **(wi/ni) + c*sqrt(ln(Ni)/ni)** 
@@ -37,11 +37,48 @@ where
  So by finding a good c, you try to maintain the balance between going deep into important branches on the movetree and determining
  what actually is important to exploit.
  
+ What is AMAF/RAVE?
+-------------------
+**AMAF** ("All moves as first") <br>
+AMAF means sharing the knowledge about the value of a move X,Y in an arbitrary position with all
+other moves (X,Y) in the UCT for that player.
+So in basic AMAF, we would just update the wins/losses for every other node, that played the same move in another position.
+
+This seems to be pretty biased, since the move is normally clearly context dependant, but it seems if the distribution is near to random, it provides good initial knowledge to get confidence for exploring a move.
+
+**α-AMAF** <br>
+If we want to change the node value weight of the AMAF estimation, we need to track AMAF wins and losses separately in the node,
+so we can compute its own value first, and then add it partially (by a factor α) to the normal UCT value.
+This is then called α-AMAF
+
+**RAVE** (Rapid action value estimation) <br>
+RAVE is basically α-AMAF, but with lowering α-factor for increasing normal playouts on that node.
+This means we basically "warm up" the tree by rapidly gathering AMAF knowledge, and as the unbiased UCT knowledge grows, we slowly lower the α until its completely gone.<br>
+
+So lets say:<br>
+**R** ... Rave warmup constant<br>
+**P** ... playouts for the node<br>
+**N** ... UCT value of the node<br>
+**Na**... RAVE value of the node<br>
+**α** ... AMAF weight factor<br>
+**NR**... combined RAVE+UCT value of the node<br>
+
+Then the α value is<br>
+α = (R-P)/R<br>
+
+if α<0, then we just take 0 instead<br>
+
+Now the final value computes as:<br>
+NR = α * Na + (1-α) x N<br>
+
+ Project status
+ --------------
  
- The current state of this projects implements both of these strategies.
- It has an estimated rank of 3kyu to 1dan, based on ManyFacesOfGo rating) on 9x9 board when playing with 10 seconds per move.
- On 19x19 it can still be considered a beginner player, even when giving around 2 minutes per move, it only achives around
- 15kyu to 20kyu playing strength. This is mostly because of a missing implementation of a good AMAF algorithm (see https://github.com/kalliduz/StegoUCT/issues/2 for reference)
+ The current state of this projects implements all of these strategies.
+ It has an estimated rank of 3kyu to 1dan, based on ManyFacesOfGo rating on 7x7 board when playing with 10 seconds per move.
+ On 19x19 it can still be considered a beginner player, mostly caused by performance issues and ineffective implementations.
+ 
+ See Issues for future plans.
  
  
  
