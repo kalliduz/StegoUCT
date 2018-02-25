@@ -32,7 +32,8 @@ type
     property Content:T read FContent;
     property Parent:TTreeNode<D,T> read FParent;
     property Depth:Integer read FDepth;
-    function GetHighestChild:TTreeNode<D,T>;
+    function GetHighestChild(const AExcludeSelf:Boolean = False):TTreeNode<D,T>;
+    function GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<D,T>;
     function CompareTo(ATreeNode:TTreeNode<D,T>):Integer;
     function AddChild(AData:T):TTreeNode<D,T>;
     function NodeCount:Int64;
@@ -52,6 +53,7 @@ type
     constructor Create(ARootNodeData:T);
     function GetHighestNode:TTreeNode<D,T>;
     function NodeCount:Int64;
+    function GetRandomLeaf:TTreeNode<D,T>;
     property RootNode:TTreeNode<D,T> read FRootNode;
     destructor Destroy;
 
@@ -60,6 +62,19 @@ type
 implementation
 
 {$REGION 'TTree implementation'}
+function TTree<D,T>.GetRandomLeaf:TTreeNode<D,T>;
+begin
+  Result:=RootNode;
+  while True do
+  begin
+    if Result.ChildCount>0 then
+    begin
+      Result:=Result.Childs[Random(Result.ChildCount)]; //choose random child as new node
+    end
+    else
+      Exit; //no childs? we found a leaf
+  end;
+end;
 destructor TTree<D,T>.Destroy;
 begin
   FRootNode.Destroy;
@@ -73,6 +88,7 @@ function TTree<D,T>.GetHighestNode:TTreeNode<D,T>;
 begin
   Result:=FRootNode.GetHighestChild;
 end;
+
  constructor TTree<D,T>.Create(ARootNodeData:T);
  begin
    inherited Create;
@@ -88,7 +104,24 @@ end;
    for i := 0 to ChildCount-1 do
     Result:=Result+Childs[i].NodeCount;
  end;
-function TTreeNode<D,T>.GetHighestChild:TTreeNode<D,T>;
+
+function TTreeNode<D,T>.GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<D,T>;
+var
+  i:Integer;
+begin
+  if AIncludeSelf then
+    Result:=Self;
+  for i := 0 to ChildCount-1 do
+  begin
+    if Result=nil then
+      Result:=Childs[i];
+    if Result.CompareTo(Childs[i])<0 then
+    begin
+      Result:=Childs[i];
+    end;
+  end;
+end;
+function TTreeNode<D,T>.GetHighestChild(const AExcludeSelf:Boolean = false):TTreeNode<D,T>;
 var
   i:Integer;
   LTemp:TTreeNode<D,T>;
@@ -96,6 +129,10 @@ begin
   Result:=Self;
   for i := 0 to ChildCount-1 do
   begin
+    if AExcludeSelf then if Result  = Self then
+    begin
+      Result:=Childs[i];
+    end;
     LTemp:=Childs[i].GetHighestChild;
     if Result.CompareTo(LTemp)<0 then  //if destination node greater than own
     begin

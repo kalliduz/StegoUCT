@@ -3,20 +3,22 @@ unit DataTypes;
 interface
   uses Graphics,Classes;
   const
-    BOARD_SIZE=9;
-    SIMULATIONS=300;
+    BOARD_SIZE=19;
+    SIMULATIONS=3000;
     UCT_BESTMOVE = 1;
+//    ALPHA_AMAF_FACTOR = 0.1;
+    ALPHA_AMAF_MINMOVES = 2000;
     UCT_NORMALMOVE = (BOARD_SIZE*BOARD_SIZE);
    // MC_TRUNK=BOARD_SIZE*BOARD_SIZE*1000000;
-    DYN_KOMI=7.5;
+    DYN_KOMI=6.5;
     MC_MOVE_REFRESH_RATE=BOARD_SIZE;
     MC_MAX_THREADS=5;
     ALLOW_SUICIDE = FALSE;
-    EXPLORATION_FACTOR_START=1.4142; //should be sqrt(2), bigger values -> broader tree
+    EXPLORATION_FACTOR_START=0; //should be sqrt(2), bigger values -> broader tree
     EXPLORATION_FACTOR_END=0.2;
     EXPLORATION_FACTOR_STEP=0.0;
 
-    AMAF_WIN_REDUCTION_FACTOR=1;
+    AMAF_WIN_REDUCTION_FACTOR=1.41;
     RESIGN_TRESHOLD = 0.15;
     MAX_AMAF_MOVES = BOARD_SIZE*BOARD_SIZE;
     CAPTURE_EXPLORE_FACTOR=1;
@@ -51,6 +53,9 @@ type
     MaxMemory:Int64;
     PlyPerSec:Int64;
     NodeCount:Int64;
+    PlayoutsXY:Int64;
+    PlayoutsXYAMAF:Int64;
+    PlayoutsAll:Int64;
     BestMoveX,BestMoveY:SmallInt;
     BestMoveWinrate:Double;
     BestResponseX,BestResponseY:SmallInt;

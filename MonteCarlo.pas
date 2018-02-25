@@ -109,24 +109,14 @@ implementation
 
           //------------------------------------------
           //---------ANTI SELF ATARI POLICY-----------------
-                    repeat
-           if APSimBoard^.PlayerOnTurn=1 then
-           begin
-                rnd:=random(len);
-                x:=movesW[rnd][1];
-                y:=movesW[rnd][2];
-           end else
-           begin
-               rnd:=random(len);
-                x:=movesB[rnd][1];
-                y:=movesB[rnd][2];
-           end;
-          until (not IsSelfAtari(x,y,ApSimBoard.PlayerOnTurn,APsimBoard))
-          OR (random(5)=0) ; //random accept self atari (if not -> can't kill enemy shapes and possible playout lock)
+
+
+           if IsSelfAtari(x,y,ApSimBoard.PlayerOnTurn,APsimBoard) and (Random(10)<>0) then
+            Continue;//random accept self atari (if not -> can't kill enemy shapes and possible playout lock)
           //-------------ANTI SELF ATARI POLICY END---------------------
 
           //-----------CATCH STONE IF YOU CAN POLICY-------------------------
-          if random((WouldCaptureAnyThing(x,y,APSimBoard)*5)+1)=0  then
+//          if random((WouldCaptureAnyThing(x,y,APSimBoard)*5)+1)=0  then
           begin
 
 
@@ -155,37 +145,37 @@ implementation
           end;  }
           //-----------CATCH STONE IF YOU CAN POLICY END-------------------------
           //--------------LOCAL MOVE POLICY----------------
-          if random(3)=0 then //prefer local answer
-          begin
-            lValCount:=0;
-            for i := 1 to 8 do
-            begin
-              lx:=APSimBoard.LastMoveCoordX+Directions[i,1];
-              ly:=APSimBoard.LastMoveCoordY+Directions[i,2];
-              valid[i]:=false;
-              if IsValidMove(lx,ly,ApSimBoard.PlayerOnTurn,ApSimBoard) then
-              begin
-                inc(lValCount);
-                valid[i]:=True;
-              end;
-            end;
-            ldoneCount:=0;
-            for i := 1 to 8 do
-            begin
-                if valid[i] then
-                begin
-                  if random(lValCount-ldoneCount)=0 then
-                  begin
-                    x:=lx;
-                    y:=ly;
-                    break;
-                  end else inc(ldoneCount);
-                end;
-
-
-            end;
-
-          end;
+//          if random(3)=0 then //prefer local answer
+//          begin
+//            lValCount:=0;
+//            for i := 1 to 8 do
+//            begin
+//              lx:=APSimBoard.LastMoveCoordX+Directions[i,1];
+//              ly:=APSimBoard.LastMoveCoordY+Directions[i,2];
+//              valid[i]:=false;
+//              if IsValidMove(lx,ly,ApSimBoard.PlayerOnTurn,ApSimBoard) then
+//              begin
+//                inc(lValCount);
+//                valid[i]:=True;
+//              end;
+//            end;
+//            ldoneCount:=0;
+//            for i := 1 to 8 do
+//            begin
+//                if valid[i] then
+//                begin
+//                  if random(lValCount-ldoneCount)=0 then
+//                  begin
+//                    x:=lx;
+//                    y:=ly;
+//                    break;
+//                  end else inc(ldoneCount);
+//                end;
+//
+//
+//            end;
+//
+//          end;
           end;
           //--------LOCAL MOVE POLICY END----------------------
           ExecuteMove (x,y,APSimBoard^.PlayerOnTurn,APSimBoard,False,False,movesB,MovesW); //else

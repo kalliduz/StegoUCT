@@ -8,6 +8,7 @@ type
   private
     FBestX,FBestY:Integer;
     FMovePlayouts:Int64;
+    FMovePlayoutsAMAF:Int64;
     FAllPlayouts:Int64;
     FUCTree:TUCTree;
     FWinrate:Double;
@@ -23,6 +24,7 @@ type
     property Winrate:Double read FWinrate;
     property NodeCount:Int64 read FNodeCount;
     property MovePlayouts:Int64 read FMovePlayouts;
+    property MovePlayoutsAMAF:Int64 read FMovePlayoutsAMAF;
     property AllPlayouts:Int64 read FAllPlayouts;
     destructor Destroy;
   end;
@@ -43,10 +45,19 @@ procedure TUCTreeThread.AddRandomSubNode(AParent:TTreeNode<PUCTData,TUCTNode>);
   i,j:Integer;
   LX,LY:Integer;
   Ltmp:Integer;
+  LWhiteWin:Boolean;
+  LNode:TTreeNode<PUCTData,TUCTNode>;
   LRandX,LRandY:array [1..BOARD_SIZE] of Integer;
 begin
    if Terminated then
    Exit;
+   if AParent.Depth > (BOARD_SIZE*BOARD_SIZE) then  //don't go too deep!
+   begin
+     AParent.Content.GetData.HasAllChilds:=True;
+     Exit;
+   end;
+   if AParent.Content.GetData.HasAllChilds then
+    Exit; //no more submoves to simulate here
    for i := 1 to BOARD_SIZE do
    begin
      LRandX[i]:=i;
@@ -90,15 +101,19 @@ begin
    end;
    if not LSuccess then
    begin
-      if not LBoard.Over then
-      if not FUCTree.DoesNodeHaveChild(AParent,0,0) then
-      begin
-        LX:=0;
-        LY:=0;
-        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False,LMoveList1,LMoveList2);
-      end
-      else
-        Exit; //if two players passed, nothing more to to here.
+//      if not LBoard.Over then
+//      if not FUCTree.DoesNodeHaveChild(AParent,0,0) then
+//      begin
+//        LX:=0;
+//        LY:=0;
+//        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False,LMoveList1,LMoveList2);
+//      end
+//      else
+//      begin
+        AParent.Content.GetData.HasAllChilds:=True;
+        Exit;
+//        Exit; //if two players passed, nothing more to do here.
+//      end;
    end;
    LPUCTData.X:=LX;
    LPUCTData.Y:=lY;
@@ -108,14 +123,26 @@ begin
    LPUCTData.IsValid:=True;
    LPUCTData.WinsWhite:=0;
    LPUCTData.WinsBlack:=0;
+   LPUCTData.WinsWhiteAMAF:=0;
+   LPUCTData.WinsBlackAMAF:=0;
+   LPUCTData.Depth:=AParent.Depth+1;
+   LPUCTData.HasAllChilds:=False;
 
    LPUCTData.ISUCTUpToDate:=False;
    LUctNode:=TUCTNode.Create;
 
    LUctNode.SetData(LPUCTData);
+   LPUCTData.AssignedNode:=LUctNode;
    FUCtree.SetPointers(LPUctData);
+   LNode:=AParent.AddChild(LUctNode);
+   LUctNode.Parent:=AParent;
+   for i := 1 to 1 do
+   begin
+    LWhiteWin:=PlayoutNode(LPUCTData);
+    FUCTree.UpdatePlayout(LNode,LWhiteWin,True);
+    FUCTree.UpdateAllAMAFSiblings(LNode,FUCTree.RootNode,LWhiteWin);
+   end;
 
-    FUCTree.UpdatePlayout(AParent.AddChild(LUctNode),    PlayoutNode(LPUCTData),True);
    LUctNode.CalculateUCTValue;
 
 
@@ -134,6 +161,7 @@ end;
   LPUCTData:PUCTData;
   LUctNode:TUCTNode;
   LBoard:PBoard;
+  LWhiteWin:Boolean;
   i:integer;
  begin
    inherited Create(True);
@@ -148,39 +176,85 @@ end;
    LPUCTData.IsValid:=True;
    LPUCTData.WinsWhite:=0;
    LPUCTData.WinsBlack:=0;
+   LPUCTData.WinsWhiteAMAF:=0;
+   LPUCTData.WinsBlackAMAF:=0;
+   LPUCTData.Depth:=0;
+
+   LPUCTData.HasAllChilds:=False;
 
    LUctNode:=TUCTNode.Create;
    LUctNode.SetData(LPUCTData);
-
+   LUctNode.Parent:=nil;
+   LPUCTData.AssignedNode:=LUctNode;
    FUCTree:=TUCTree.Create(LUctNode);
    FUCtree.SetPointers(LPUctData);
-   FUCTree.UpdatePlayout(FUCTree.RootNode,PlayoutNode(LPUCTData),True);
+   LWhiteWin:=PlayoutNode(LPUCTData);
+   FUCTree.UpdatePlayout(FUCTree.RootNode,LWhiteWin,True);
    LUctNode.CalculateUCTValue;
    Resume;
  end;
  procedure TUCTreeThread.Execute;
  var
   LHighestNode:TTreeNode<PUCTData,TUCTNode>;
+  LLast:TTreeNode<PUCTData,TUCTNode>;
   Ply:Integer;
-  i:Integer;
+  LWhiteWin:Boolean;
+  i,j:Integer;
  begin
-  for i := 1 to (BOARD_SIZE*BOARD_SIZE) do
-  begin
-    AddRandomSubNode(FUCTree.RootNode);
-  end;
+//  for i := 1 to (BOARD_SIZE*BOARD_SIZE) do
+//  begin
+//    AddRandomSubNode(FUCTree.RootNode);
+//  end;
   i:=0;
   while True do
   begin
       if Terminated then
         Exit;
       inc(i);
-      LHighestNode:=FUCTree.GetHighestNode;
-      FUCTree.UpdatePlayout(LHighestNode,PlayoutNode(LHighestNode.Content.GetData),True);
-      if i mod 2  = 0 then
-        AddRandomSubNode(FUCTree.GetBestMoveNode(FUCTree.RootNode,False,0));
+
+       LHighestNode:=FUCTree.RootNode.GetHighestDirectChild;
+       LLast:=LHighestNode;
+       while true do
+       begin
+         LHighestNode:=LHighestNode.GetHighestDirectChild(not LHighestNode.Content.GetData.HasAllChilds);
+          // --> if this node already has all moves set, he should not consider himself for exploitation, but give it to a child
+         if LLast = LHighestNode then Break;
+         LLast :=LHighestNode;
+       end;
+       AddRandomSubNode(LHighestNode);
+
+//       if LHighestNode.Content.GetData.HasAllChilds then
+//         LHighestNode:=LHighestNode.GetHighestDirectChild; //if node is not exploitable any more, choose best child
+//
+//       AddRandomSubNode(LHighestNode);
+//
+//       if LHighestNode.Content.GetData.HasAllChilds then
+//        LHighestNode:=LHighestNode.GetHighestDirectChild; //if node is not exploitable any more, choose best child
+//
+//
+//        AddRandomSubNode(LHighestNode);
 
 
-        LHighestNode:=FUCTree.GetBestMoveNode(FUCTree.RootNode,True,0);
+             if LHighestNode.Content.GetData.HasAllChilds then //if we got to simulate all positions until depth 3
+             begin
+                LHighestNode:=FUCTree.GetRandomLeaf;
+                LWhiteWin:=PlayoutNode(LHighestNode.Content.GetData);
+                FUCTree.UpdatePlayout(LHighestNode,LWhiteWIn,True);
+                FUCTree.UpdateAllAMAFSiblings(LHighestNode,FUCTree.RootNode,LWhiteWin);
+             end;
+
+
+//
+//        for j := 1 to 10 do
+//       begin
+//            LHighestNode:=FUCTree.GetRandomLeaf;
+//            LWhiteWin:=PlayoutNode(LHighestNode.Content.GetData);
+//            FUCTree.UpdatePlayout(LHighestNode,LWhiteWIn,True);
+//            FUCTree.UpdateAllAMAFSiblings(LHighestNode,FUCTree.RootNode,LWhiteWin);
+//       end;
+
+      LHighestNode:=FUCTree.GetBestMoveNode(FUCTree.RootNode,True,0);
+
       FBestX:=LHighestNode.Content.GetData.X;
       FBestY:=LHighestNode.Content.GetData.Y;
       Ply:=LHighestNode.Content.GetData.WinsWhite+LHighestNode.Content.GetData.WinsBlack;
@@ -189,6 +263,7 @@ end;
       else
         FWinrate:=-1;
       FMovePlayouts:=Ply;
+      FMovePlayoutsAMAF:=LHighestNode.Content.GetData.WinsWhiteAMAF+LHighestNode.Content.GetData.WinsBlackAMAF;
       FAllPlayouts:=LHighestNode.Content.GetData.WinsWhiteTotal^+LHighestNode.Content.GetData.WinsBlackTotal^;
       FNodeCount:=FUCTree.NodeCount;
   end;

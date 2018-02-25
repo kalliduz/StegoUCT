@@ -203,7 +203,7 @@ implementation
                 dummy1,dummy2
                 );
     CalculateNewTime;
-    UseOldUCTAt(X,Y);
+   // UseOldUCTAt(X,Y);
     CreateThreads;
   end;
   procedure TGameManager.ComputerMoveNow;
@@ -211,25 +211,34 @@ implementation
   begin
 
     if not Assigned(FThinkThread) then Exit;
-    StopThreads;
+
     if FBoard.LastPlayerPassed then
+    begin
+      StopThreads;
       ExecuteMove(FThinkThread.BestX,FThinkThread.BestY,
                   FBoard.PlayerOnTurn,
                   @FBoard,
                   true, //passmove criterium
                   False,
                   dummy1,dummy2
-                  )
+
+               );
+    end
     else
-    ExecuteMove(X,Y,
-                FBoard.PlayerOnTurn,
-                @FBoard,
-                (X=0)AND(Y=0), //passmove criterium
-                False,
-                dummy1,dummy2
-                );
+    begin
+      X:=FThinkThread.BestX;
+      Y:=FThinkThread.BestY;
+      StopThreads;
+      ExecuteMove(X,Y,
+                  FBoard.PlayerOnTurn,
+                  @FBoard,
+                  (X=0)AND(Y=0), //passmove criterium
+                  False,
+                  dummy1,dummy2
+                  );
+    end;
     CalculateNewTime;
-    UseOldUCTAt(X,Y);
+    MoveNow(X,Y);
     StartThreads;
   end;
   procedure TGameManager.OnThinkTimer(Sender:TObject);
@@ -281,6 +290,9 @@ implementation
       gameInfo.BestMoveWinrate:=FThinkThread.Winrate;
       gameInfo.BestResponseX:=-1;
       gameInfo.BestResponseY:=-1; //TODO Implement
+      gameInfo.PlayoutsXY:=FThinkThread.MovePlayouts;
+      gameInfo.PlayoutsXYAMAF:=FThinkThread.MovePlayoutsAMAF;
+      gameInfo.PlayoutsAll:=FThinkThread.AllPlayouts;
 
       gameInfo.BestResponseWinrate:=-1; //TODO Implement
 

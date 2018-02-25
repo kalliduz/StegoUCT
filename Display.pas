@@ -38,6 +38,9 @@ implementation
    lText:=inttostr(AGameInformation.MemoryUsed div 1024 div 1024)+ 'MB of '+inttostr(AGameInformation.MaxMemory div 1024 div 1024)+' MB'+#13#10;
    lText:=lText+inttostr(AGameInformation.NodeCount)+' Nodes'+#13#10;
    lText:=lText+'Ply/Sec: '+Inttostr(AGameInformation.PlyPerSec)+#13#10;
+   lText:=lText+'Move playouts: '+inttostr(AGameInformation.PlayoutsXY)+#13#10;
+   lText:=lText+'Move AMAF playouts: '+inttostr(AGameInformation.PlayoutsXYAMAF)+#13#10;
+   lText:=lText+'Playouts total: '+inttostr(AGameInformation.PlayoutsAll)+#13#10;
    lText:=lText+'Best sequence:'+#13#10
    +'['+inttostr(AGameInformation.BestMoveX)+', '+inttostr(AGameInformation.BestMoveY)+'] ('+floattostr(round(AGameInformation.BestMoveWinrate*100)/100)+' %)'+#13#10
    +'['+inttostr(AGameInformation.BestResponseX)+', '+inttostr(AGameInformation.BestResponseY)+'] ('+floattostr(round(AGameInformation.BestResponseWinrate*100)/100)+' %)'+#13#10;
@@ -52,6 +55,7 @@ implementation
   x:=round((Ax+offset)/step);
   y:=round((Ay+offset)/step);
  end;
+
  procedure PaintWinrateBar(ADrawImage:TImage;AWinrate:Double);
  var mid:integer;
  begin
