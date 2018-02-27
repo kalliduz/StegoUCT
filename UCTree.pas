@@ -198,21 +198,24 @@ var
   LPlyAMAFTotal:Double;
   LPlyAMAFUCT:Double;
   LAlphaAMAFFactor:Double;
+  lRealToAmaf:Double;
+  LAMAFWR:Double;
+  LWr:Double;
 begin
   //if not FData.ISUCTUpToDate then
   begin
 
     LPly:=FData.WinsWhite+FData.WinsBlack;
-    LPlyAMAF:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF;
+    LPlyAMAF:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF+LPly;
     if Assigned(Parent) then
     begin
       LPlyTotal:=Parent.Content.GetData^.WinsWhite+Parent.Content.GetData^.WinsBlack;
-      LPlyAMAFTotal:=Parent.Content.GetData^.WinsWhiteAMAF+Parent.Content.GetData^.WinsBlackAMAF;
+      LPlyAMAFTotal:=Parent.Content.GetData^.WinsWhiteAMAF+Parent.Content.GetData^.WinsBlackAMAF+LPlyTotal;
     end
     else
     begin
       LPlyTotal:=FData.WinsWhite+FData.WinsBlack;
-      LPlyAMAFTotal:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF;
+      LPlyAMAFTotal:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF+LPlyTotal;
     end;
 
     if (LPly>0) and (LPlyTotal>0) then
@@ -220,33 +223,43 @@ begin
       if FData.FBoard.PlayerOnTurn = 2 then
       begin
         LWins:=FData.WinsWhite;
-        LWinsAMAF:=FData.WinsWhiteAMAF;
+        LWinsAMAF:=FData.WinsWhiteAMAF+FData.WinsWhite; //always include real wins for amaf calculation in case of small AMAFs
       end
       else
       begin
         LWins:=FData.WinsBlack;
-        LWinsAMAF:=FData.WinsBlackAMAF;
+        LWinsAMAF:=FData.WinsBlackAMAF+FData.WinsBlack;
       end;
 
-      FData.UCTVal:= (( LWins/LPly)
-         +EXPLORATION_FACTOR_START*
-         sqrt(Ln(LPlyTotal)/LPly));///(FData.Depth+1);
+
       if (LPlyAMAF>0) and (LPlyAMAFTotal>0) then
       begin
         LPlyAMAFUCT:= ((LWinsAMAF/LPlyAMAF)
           +EXPLORATION_FACTOR_START*
           Sqrt(Ln(LPlyAMAFTotal)/LPlyAMAF));///(FData.Depth+1);
+          ///
+        LAMAFWR:=LWinsAMAF/LPlyAMAF;
       end else
         LPlyAMAFUCT:=0;
+
       LAlphaAMAFFactor:=(ALPHA_AMAF_MINMOVES - LPly)/ALPHA_AMAF_MINMOVES;
+
+
 
       if LAlphaAMAFFactor<0 then
         LAlphaAMAFFactor:=0;
-      if LPlyAMAFUCT > 0 then //if we don't have AMAF data, don't tamper with original playout values!
-      begin
-        FData.UCTVal:=FData.UCTVal*(1-LAlphaAMAFFactor) +
-                      LAlphaAMAFFactor * LPlyAMAFUCT;
-      end;
+
+        LWr:=LWins/LPly;
+        LWr:=Lwr*(1-LAlphaAMAFFactor)+LAMAFWR*LAlphaAMAFFactor;
+          FData.UCTVal:= (LWr
+         +EXPLORATION_FACTOR_START*
+         sqrt(Ln(LPlyTotal)/LPly));///(FData.Depth+1);
+         ///
+//      if LPlyAMAFUCT > 0 then //if we don't have AMAF data, don't tamper with original playout values!
+//      begin
+//        FData.UCTVal:=FData.UCTVal*(1-LAlphaAMAFFactor) +
+//                      LAlphaAMAFFactor * LPlyAMAFUCT;
+//      end;
     end else
       FData.UCTVal:=1000;
 

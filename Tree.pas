@@ -109,6 +109,7 @@ function TTreeNode<D,T>.GetHighestDirectChild(const AIncludeSelf:Boolean = True)
 var
   i:Integer;
 begin
+  Result:=nil;
   if AIncludeSelf then
     Result:=Self;
   for i := 0 to ChildCount-1 do

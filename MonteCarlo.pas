@@ -111,7 +111,7 @@ implementation
           //---------ANTI SELF ATARI POLICY-----------------
 
 
-           if IsSelfAtari(x,y,ApSimBoard.PlayerOnTurn,APsimBoard) and (Random(10)<>0) then
+           if IsSelfAtari(x,y,ApSimBoard.PlayerOnTurn,APsimBoard) and (Random(2)=0) then
             Continue;//random accept self atari (if not -> can't kill enemy shapes and possible playout lock)
           //-------------ANTI SELF ATARI POLICY END---------------------
 

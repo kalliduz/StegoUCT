@@ -15,6 +15,7 @@ type
     FNodeCount:Int64;
     function PlayoutNode(ANode:PUCTData):Boolean; //true if player on turn wins
     procedure AddRandomSubNode(AParent:TTreeNode<PUCTData,TUCTNode>);
+    function AddSpecificSubNode(AParent:TTreeNode<PUCTData,TUCTNode>;AX,AY:Integer):Boolean;
   protected
     procedure Execute;override;
   public
@@ -34,6 +35,76 @@ destructor TUCTreeThread.Destroy;
 begin
   FUCTree.Destroy;
   Inherited Destroy;
+end;
+
+function TUCTreeThread.AddSpecificSubNode(AParent:TTreeNode<PUCTData,TUCTNode>;AX,AY:Integer):Boolean;
+ var
+  LPUCTData:PUCTData;
+  LUctNode:TUCTNode;
+  LBoard:PBoard;
+  LMoveList1,LMoveList2:TMoveList;
+  LSuccess:Boolean;
+  i,j:Integer;
+  LX,LY:Integer;
+  Ltmp:Integer;
+  LWhiteWin:Boolean;
+  LNode:TTreeNode<PUCTData,TUCTNode>;
+  LRandX,LRandY:array [1..BOARD_SIZE] of Integer;
+begin
+  Result:=False;
+   if Terminated then
+   Exit;
+   if AParent.Content.GetData.HasAllChilds then
+    Exit; //no more submoves to simulate here
+
+
+   LBoard:=new(PBoard);
+
+   SetLength(LMoveList1,0);
+   SetLength(LMoveList2,0);
+   Move(AParent.Content.GetData.FBoard^,LBoard^,SizeOf(TBoard));
+   LPUCTData:= new(PUCTData);
+   Result:=False;
+
+   if  IsValidMove(AX,AY,LBoard.PlayerOnTurn,LBoard) then
+   begin
+     Result:=True;
+     ExecuteMove(AX,AY,LBoard.PlayerOnTurn,LBoard,False,False,LMoveList1,LMoveList2);
+   end
+   else
+    Exit;
+
+   LPUCTData.X:=AX;
+   LPUCTData.Y:=AY;
+
+   LPUCTData.FBoard:=LBoard;
+   LPUCTData.IsPassMove:= ((AX=0) and(AY=0)) ;
+   LPUCTData.IsValid:=True;
+   LPUCTData.WinsWhite:=0;
+   LPUCTData.WinsBlack:=0;
+   LPUCTData.WinsWhiteAMAF:=0;
+   LPUCTData.WinsBlackAMAF:=0;
+   LPUCTData.Depth:=AParent.Depth+1;
+   LPUCTData.HasAllChilds:=False;
+
+   LPUCTData.ISUCTUpToDate:=False;
+   LUctNode:=TUCTNode.Create;
+
+   LUctNode.SetData(LPUCTData);
+   LPUCTData.AssignedNode:=LUctNode;
+   FUCtree.SetPointers(LPUctData);
+   LNode:=AParent.AddChild(LUctNode);
+   LUctNode.Parent:=AParent;
+   for i := 1 to 1 do
+   begin
+    LWhiteWin:=PlayoutNode(LPUCTData);
+    FUCTree.UpdatePlayout(LNode,LWhiteWin,True);
+    FUCTree.UpdateAllAMAFSiblings(LNode,FUCTree.RootNode,LWhiteWin);
+   end;
+
+   LUctNode.CalculateUCTValue;
+
+
 end;
 procedure TUCTreeThread.AddRandomSubNode(AParent:TTreeNode<PUCTData,TUCTNode>);
  var
@@ -201,10 +272,19 @@ end;
   LWhiteWin:Boolean;
   i,j:Integer;
  begin
-//  for i := 1 to (BOARD_SIZE*BOARD_SIZE) do
-//  begin
-//    AddRandomSubNode(FUCTree.RootNode);
-//  end;
+
+  //first lets add all possible moves as first nodes in the tree
+  for i := 1 to BOARD_SIZE do
+  begin
+    for j := 1 to BOARD_SIZE do
+    begin
+      AddSpecificSubNode(FUCTree.RootNode,i,j);
+    end;
+  end;
+   AddSpecificSubNode(FUCTree.RootNode,0,0);
+
+
+
   i:=0;
   while True do
   begin
@@ -214,15 +294,29 @@ end;
 
        LHighestNode:=FUCTree.RootNode.GetHighestDirectChild;
        LLast:=LHighestNode;
+
+
        while true do
        begin
-         LHighestNode:=LHighestNode.GetHighestDirectChild(not LHighestNode.Content.GetData.HasAllChilds);
+
+          if Assigned(LHighestNode) then
+            AddRandomSubNode(LHighestNode);
+
+          LHighestNode:=LHighestNode.GetHighestDirectChild(not LHighestNode.Content.GetData.HasAllChilds);
+
           // --> if this node already has all moves set, he should not consider himself for exploitation, but give it to a child
-         if LLast = LHighestNode then Break;
+         if (LLast = LHighestNode)or (LHighestNode = nil)  then Break;
          LLast :=LHighestNode;
        end;
-       AddRandomSubNode(LHighestNode);
-
+       LHighestNode:=LLast; //after executing, roll it back to the last safe node
+//        for i := 1 to BOARD_SIZE do
+//        begin
+//          for j := 1 to BOARD_SIZE do
+//          begin
+//            AddSpecificSubNode(LHighestNode,i,j);
+//          end;
+//        end;
+//          AddSpecificSubNode(LHighestNode,0,0);
 //       if LHighestNode.Content.GetData.HasAllChilds then
 //         LHighestNode:=LHighestNode.GetHighestDirectChild; //if node is not exploitable any more, choose best child
 //
