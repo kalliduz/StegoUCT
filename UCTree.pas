@@ -8,7 +8,7 @@ type
   //Choose best move to get childs from !!!!
   //not best UCT! This is only for exploration
   //get actually the most interesting move, which means the most critical winrate at his level
-  TUCTNode = class;
+//  TUCTNode = class(ICompareableData);
   TUCTData = record
     X,Y : Integer;
     FBoard:PBoard;
@@ -24,43 +24,50 @@ type
     WinsWhiteTotal:^Int64;
     WinsBlackTotal:^Int64;
     Depth:Integer;
-    AssignedNode:TUCTNode;
+    AssignedNode:Pointer;
   end;
   PUCTData = ^TUCTData;
 
-  TUCTNode = class(TInterfacedObject,ICompareableData<PUCTData>)
+  TUCTNode = class(TInterfacedObject,ICompareableData)
   private
     FData:PUCTData;
-    FParent:TTreeNode<PUCTData,TUCTNode>;
-  public
-    procedure FreeData;
-    function CompareTo(AData:PUCTData):Integer;
+    FParent:TTreeNode<TUCTNode>;
     function GetData:PUCTData;
     procedure SetData(AData:PUCTData);
+  public
+    procedure FreeData;
+    function CompareTo(AObject:TObject):Integer;
+    property Data:PUCTData read GetData write SetData;
     function CalculateUCTValue:Double;
-    property Parent:TTreeNode<PUCTData,TUCTNode> read FParent write FParent;
+    property Parent:TTreeNode<TUCTNode> read FParent write FParent;
+    destructor Destroy; override;
   end;
 
-  TUCTree = class(TTree<PUCTData,TUCTNode>)
+  TUCTree = class(TTree<TUCTNode>)
   private
     FWinsWhiteTotal:Int64;
     FWinsBlackTotal:Int64;
   public
-      function DoesNodeHaveChild(ANode:TTreeNode<PUCTData,TUCTNode>;AX,AY:Integer):Boolean; //is there a good way to do this generic?
-      procedure SetPointers(ANodeData:PUCTData);
-      function GetBestMoveNode(ARootNode:TTreeNode<PUCTData,TUCTNode>;
+      function DoesNodeHaveChild(ANode:TTreeNode<TUCTNode>;AX,AY:Integer):Boolean; //is there a good way to do this generic?
+      procedure SetPointers(ANodeData:TUCtNode);
+      function GetBestMoveNode(ARootNode:TTreeNode<TUCTNode>;
                               const AOnlyFirstLevel:Boolean = True;
                               const InitialWR:Double = 0
-                              ):TTreeNode<PUCTData,TUCTNode>;
-      function UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<PUCTData,TUCTNode>;ARootNode:TTreeNode<PUCTData,TUCTNode>;AIsWhiteWin:Boolean):Boolean;
+                              ):TTreeNode<TUCTNode>;
+      function UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean):Boolean;
 
                                                         // Maybe a "key" value in the treenode
-    procedure UpdatePlayout(ANode:TTreeNode<PUCTData,TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
+    procedure UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
     constructor Create(ARootNodeData:TUCTNode);reintroduce;
   end;
 
 implementation
- function TUCTree.UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<PUCTData,TUCTNode>;ARootNode:TTreeNode<PUCTData,TUCTNode>;AIsWhiteWin:Boolean):Boolean;
+destructor TUCTNode.Destroy;
+begin
+  FreeData;
+  inherited Destroy;
+end;
+ function TUCTree.UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean):Boolean;
 var
   i:Integer;
 begin
@@ -85,7 +92,7 @@ begin
   FWinsWhiteTotal:=0;
   FWinsBlackTotal:=0;
 end;
- function TUCTree.GetBestMoveNode(ARootNode:TTreeNode<PUCTData,TUCTNode>;const AOnlyFirstLevel:Boolean = True;const InitialWR:Double  = 0):TTreeNode<PUCTData,TUCTNode>;
+ function TUCTree.GetBestMoveNode(ARootNode:TTreeNode<TUCTNode>;const AOnlyFirstLevel:Boolean = True;const InitialWR:Double  = 0):TTreeNode<TUCTNode>;
  var
   CurWR,BestWR:Double;
   Ply:Int64;
@@ -119,13 +126,13 @@ end;
   end;
  end;
 
-procedure TUCTree.SetPointers(ANodeData:PUCTData);
+procedure TUCTree.SetPointers(ANodeData:TUCTNode);
 begin
-  ANodeData.WinsWhiteTotal:=@FWinsWhiteTotal;
-  ANodeData.WinsBlackTotal:=@FWinsBlackTotal;
+  ANodeData.Data.WinsWhiteTotal:=@FWinsWhiteTotal;
+  ANodeData.Data.WinsBlackTotal:=@FWinsBlackTotal;
 end;
 
-procedure TUCTree.UpdatePlayout(ANode:TTreeNode<PUCTData,TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
+procedure TUCTree.UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
 var
   LPUCTData:PUCTData;
 begin
@@ -167,7 +174,7 @@ end;
 
 end;
 
-function TUCTree.DoesNodeHaveChild(ANode:TTreeNode<PUCTData,TUCTNode>;AX,AY:Integer):Boolean;
+function TUCTree.DoesNodeHaveChild(ANode:TTreeNode<TUCTNode>;AX,AY:Integer):Boolean;
 var
   i:Integer;
 begin
@@ -274,9 +281,9 @@ begin
   Dispose(FData);
 end;
 
-function TUCTNode.CompareTo(AData:PUCTData):Integer;
+function TUCTNode.CompareTo(AObject:TObject):Integer;
 begin
-  Result:= IfThen((CalculateUCTValue-AData.AssignedNode.CalculateUCTValue)<0,-1,1);
+    Result:= IfThen((CalculateUCTValue- TUCTNode(AObject).CalculateUCTValue)<0,-1,1);
 end;
 
 function TUCTNode.GetData:PUCTData;

@@ -6,55 +6,55 @@ uses
   System.Generics.Defaults,
   System.Generics.Collections;
 type
-  ICompareableData<T> = interface
+  ICompareableData = interface
   ['{C7B36C09-DFE7-4177-8634-7C865FE7FDB6}']
-    function GetData:T;
-    function CompareTo(AData:T):Integer;
+//    function GetData:T;
+    function CompareTo(AObject:TOBject):Integer;
                                          //<0 -> this object is less than other
                                          //=0 -> this object has same value as other
                                          //>0 -> this object has greater value than other
-    procedure FreeData;                  //provide your own free method for your data!
+//    procedure FreeData;                  //provide your own free method for your data!
 
   end;
 
 
-  TTreeNode<D;T:ICompareableData<D>> = class(TObject)
+  TTreeNode<T:ICompareableData> = class(TObject)
   private
     FContent:T;
     FDepth:Integer;
-    FParent:TTreeNode<D,T>;
-    FChilds:TList<TTreeNode<D,T>>;
+    FParent:TTreeNode<T>;
+    FChilds:TList<TTreeNode<T>>;
     function GetChildCount:Int64;
-    function GetChildAtIndex(AIndex:Int64):TTreeNode<D,T>;
+    function GetChildAtIndex(AIndex:Int64):TTreeNode<T>;
   public
     property ChildCount:Int64 read GetChildCount;
-    property Childs[Index:Int64]:TTreeNode<D,T> read GetChildAtIndex;
+    property Childs[Index:Int64]:TTreeNode<T> read GetChildAtIndex;
     property Content:T read FContent;
-    property Parent:TTreeNode<D,T> read FParent;
+    property Parent:TTreeNode<T> read FParent;
     property Depth:Integer read FDepth;
-    function GetHighestChild(const AExcludeSelf:Boolean = False):TTreeNode<D,T>;
-    function GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<D,T>;
-    function CompareTo(ATreeNode:TTreeNode<D,T>):Integer;
-    function AddChild(AData:T):TTreeNode<D,T>;
+    function GetHighestChild(const AExcludeSelf:Boolean = False):TTreeNode<T>;
+    function GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<T>;
+    function CompareTo(ATreeNode:TTreeNode<T>):Integer;
+    function AddChild(AData:T):TTreeNode<T>;
     function NodeCount:Int64;
 
-    constructor Create(AData:T;AParent:TTreeNode<D,T>);
+    constructor Create(AData:T;AParent:TTreeNode<T>);
     destructor Destroy;
   end;
 
-  TTree<D;T:ICompareableData<D>> = class
+  TTree<T:class,ICompareableData> = class
   private
-    FRootNode:TTreeNode<D,T>;
+    FRootNode:TTreeNode<T>;
     FNodeCount:Int64;
     FMemoryUsed:Int64; //in bytes
     FMaxDepth:Int64;
 
   public
     constructor Create(ARootNodeData:T);
-    function GetHighestNode:TTreeNode<D,T>;
+    function GetHighestNode:TTreeNode<T>;
     function NodeCount:Int64;
-    function GetRandomLeaf:TTreeNode<D,T>;
-    property RootNode:TTreeNode<D,T> read FRootNode;
+    function GetRandomLeaf:TTreeNode<T>;
+    property RootNode:TTreeNode<T> read FRootNode;
     destructor Destroy;
 
   end;
@@ -62,7 +62,7 @@ type
 implementation
 
 {$REGION 'TTree implementation'}
-function TTree<D,T>.GetRandomLeaf:TTreeNode<D,T>;
+function TTree<T>.GetRandomLeaf:TTreeNode<T>;
 begin
   Result:=RootNode;
   while True do
@@ -75,28 +75,28 @@ begin
       Exit; //no childs? we found a leaf
   end;
 end;
-destructor TTree<D,T>.Destroy;
+destructor TTree<T>.Destroy;
 begin
   FRootNode.Destroy;
   inherited Destroy;
 end;
-function TTree<D,T>.NodeCount:Int64;
+function TTree<T>.NodeCount:Int64;
 begin
   Result:=FRootNode.NodeCount;
 end;
-function TTree<D,T>.GetHighestNode:TTreeNode<D,T>;
+function TTree<T>.GetHighestNode:TTreeNode<T>;
 begin
   Result:=FRootNode.GetHighestChild;
 end;
 
- constructor TTree<D,T>.Create(ARootNodeData:T);
+ constructor TTree<T>.Create(ARootNodeData:T);
  begin
    inherited Create;
-   FRootNode:=TTreeNode<D,T>.Create(ARootNodeData,nil);
+   FRootNode:=TTreeNode<T>.Create(ARootNodeData,nil);
  end;
  {$ENDREGION}
 {$REGION ' TTreeNode Implementation'}
- function TTreeNode<D,T>.NodeCount:Int64;
+ function TTreeNode<T>.NodeCount:Int64;
  var
   i:Integer;
  begin
@@ -105,7 +105,7 @@ end;
     Result:=Result+Childs[i].NodeCount;
  end;
 
-function TTreeNode<D,T>.GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<D,T>;
+function TTreeNode<T>.GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<T>;
 var
   i:Integer;
 begin
@@ -122,10 +122,10 @@ begin
     end;
   end;
 end;
-function TTreeNode<D,T>.GetHighestChild(const AExcludeSelf:Boolean = false):TTreeNode<D,T>;
+function TTreeNode<T>.GetHighestChild(const AExcludeSelf:Boolean = false):TTreeNode<T>;
 var
   i:Integer;
-  LTemp:TTreeNode<D,T>;
+  LTemp:TTreeNode<T>;
 begin
   Result:=Self;
   for i := 0 to ChildCount-1 do
@@ -142,7 +142,7 @@ begin
   end;
 end;
 
-destructor TTreeNode<D,T>.Destroy;
+destructor TTreeNode<T>.Destroy;
 var
   i:Integer;
 begin
@@ -150,11 +150,11 @@ begin
   begin
     Childs[i].Destroy;
   end;
-  Content.FreeData;
+  PObject(@Content)^.Destroy;
   inherited Destroy;
 end;
 
-constructor TTreeNode<D,T>.Create(AData:T;AParent:TTreeNode<D,T>);
+constructor TTreeNode<T>.Create(AData:T;AParent:TTreeNode<T>);
 begin
   inherited Create;
   FContent:=AData;
@@ -163,15 +163,15 @@ begin
     FDepth:=0
   else
     FDepth:=AParent.Depth+1;
-  FChilds:=TList<TTreeNode<D,T>>.Create;
+  FChilds:=TList<TTreeNode<T>>.Create;
 end;
 
-  function TTreeNode<D,T>.CompareTo(ATreeNode:TTreeNode<D,T>):Integer;
+  function TTreeNode<T>.CompareTo(ATreeNode:TTreeNode<T>):Integer;
   begin
-    Result:= Content.CompareTo(ATreeNode.Content.GetData);
+    Result:= Content.CompareTo(PObject(@ATreeNode.Content)^);
   end;
 
-  function TTreeNode<D,T>.GetChildAtIndex(AIndex:Int64):TTreeNode<D,T>;
+  function TTreeNode<T>.GetChildAtIndex(AIndex:Int64):TTreeNode<T>;
   begin
     Result:=nil;
     if AIndex<0 then
@@ -181,17 +181,17 @@ end;
     Result:= FChilds[AIndex];
   end;
 
-  function TTreeNode<D,T>.GetChildCount:Int64;
+  function TTreeNode<T>.GetChildCount:Int64;
   begin
     Result:= FChilds.Count;
   end;
 
-  function TTreeNode<D,T>.AddChild(AData:T):TTreeNode<D,T>;
+  function TTreeNode<T>.AddChild(AData:T):TTreeNode<T>;
   var
-    LTreeNode:TTreeNode<D,T>;
+    LTreeNode:TTreeNode<T>;
   begin
 
-    LTreeNode:=TTreeNode<D,T>.Create(AData,Self);
+    LTreeNode:=TTreeNode<T>.Create(AData,Self);
     FChilds.Add(LTreeNode);
     Result:=LTreeNode;
   end;

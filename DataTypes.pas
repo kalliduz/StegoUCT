@@ -14,7 +14,7 @@ interface
     MC_MOVE_REFRESH_RATE=BOARD_SIZE;
     MC_MAX_THREADS=5;
     ALLOW_SUICIDE = FALSE;
-    EXPLORATION_FACTOR_START=1.41; //should be sqrt(2), bigger values -> broader tree
+    EXPLORATION_FACTOR_START=0.5; //should be sqrt(2), bigger values -> broader tree
     EXPLORATION_FACTOR_END=0.2;
     EXPLORATION_FACTOR_STEP=0.0;
 
