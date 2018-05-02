@@ -5,13 +5,17 @@ interface
 /// TODOS:
 /// - rewrite movelists to static arrays
 /// - rewrite all IsEqualField to its static replacement (out of bounds allowed now)
-uses DataTypes;
+uses DataTypes,Types;
+
     //------NOT DEPENDING ON VALID MOVES------------------------
     function RecMarkGroupSize(ARecX,ARecY:SmallInt;APBoard:PBoard;FirstCall:Boolean):SmallInt;
     function IsValidMove(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
-    function CountLibertiesRec(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean;MarkedFields:PMarkList;var ALen:SmallInt;AStopAfterTwo:Boolean):SmallInt;
-    function HasLiberties(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean; //much faster than test CountLiberties = 0
-    function IsEqualField(AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;
+    function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
+    function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt; const AStopAfterTwo:Boolean):SmallInt;
+    function CountLibertiesRec_(const AX,AY:SmallInt;const APBoard:PBoard;const AFirstCall:Boolean;const MarkedFields:PMarkList;var ALen:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
+    function CountLibertiesIterative_(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
+   // function HasLiberties(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean; //much faster than test CountLiberties = 0
+    function IsEqualField(const AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;inline;
     function ExecuteMove(AX,AY,AColor:SmallInt;APBoard:PBoard;ANullMove:Boolean;AFastMode:Boolean;var MovesB,MovesW:TMoveList):Boolean; //fastmode requires valid move check
     function RemoveGroupRec(AX,AY:SmallInt;APBoard:PBoard;var MovesB,MovesW:TMoveList):SmallInt;
     procedure ResetBoard(APBoard:PBoard);
@@ -38,10 +42,172 @@ uses DataTypes;
   function IsKoValidMove(AX,AY:SmallInt;APBoard:PBoard):Boolean;
   function IsSuicide(AX,AY:SmallInt;AColor:SmallInt; APBoard:PBoard):Boolean;
   //--------------------------------------------
-    function ReverseColor(AColor:SmallInt):SmallInt;
+    function ReverseColor(AColor:SmallInt):SmallInt;inline;
+
+
+
 implementation
 
-uses Math;
+
+uses Math,System.Generics.Collections,Winapi.Windows;
+threadvar
+  LRecursionCounter:Integer;
+
+function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
+procedure MarkAndCall(const X,Y:SmallInt);
+begin
+  if AStopAfterTwo and (LRecursionCounter>= 2) then
+    Exit;
+  if APBoard.Occupation[X,Y] = AMatchColor then
+  begin
+    Result:=Result+CountLibertiesRecursive(X,Y,APBoard,AMatchColor,AStopAfterTwo);
+    {
+      if the field is a stone, we just want its remaining liberties
+    }
+  end else
+  begin
+    if APBoard.Occupation[X,Y] = 0 then
+    begin
+      APBoard.Occupation[X,Y] := 254; //the actual marking doesnt matter here
+      Inc(Result);
+      Inc(LRecursionCounter);
+      {
+        if the field is empty, its a group liberty, so we count and mark it
+      }
+    end;
+  end;
+end;
+begin
+  Result:=0;
+  if ((AStopAfterTwo) AND (LRecursionCounter >= 2)) then
+    Exit;
+  //we can assume this is a valid stone, because otherwise this proc
+  //wouldn't have been called
+  APBoard.Occupation[AX,AY]:=255; //so lets mark it as a group stone before we call the recursion
+  MarkAndCall(AX-1,AY);
+  MarkAndCall(AX+1,AY);
+  MarkAndCall(AX,AY-1);
+  MarkAndCall(AX,AY+1);
+
+
+end;
+function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
+var
+  LBoard:PBoard;
+begin
+    if AStopAfterTwo then
+      LRecursionCounter:=0;
+    Result:=0;
+    //first step: general boundary check
+    if AX=0 then exit;
+    if AY=0 then exit;
+    if AX>BOARD_SIZE then exit;
+    if AY>BOARD_SIZE then exit;
+    New(LBoard);
+    CopyMemory(LBoard,APBoard,sizeof(APBoard^));
+    Result:= CountLibertiesRecursive(AX,AY,LBoard,LBoard.Occupation[AX,AY],AStopAfterTwo);
+    Dispose(LBoard);
+end;
+
+  function CountLibertiesIterative_(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
+  var
+    LBoard:PBoard;
+    LCol:SmallInt;
+    LTop,LLeft,LRight,LDown:SmallInt;
+    LMarked:Boolean;
+    i,j:Integer;
+  procedure AddMarkAndExtendRect(const X,Y:SmallInt);
+  begin
+    if LBoard.Occupation[X,Y] = 0 then
+    begin
+      LBoard.Occupation[X,Y]:=254; //liberty marker
+    end else
+    begin
+      if LBoard.Occupation[X,Y] = LCol then
+      begin
+        LMarked:=True;
+        LBoard.Occupation[X,Y]:=255;
+        //expanding the rectangle
+        if X<LLeft then
+          LLeft:=X;
+        if X>LRight then
+          LRight:=X;
+        if Y<LTop then
+          LTop:=Y;
+        if Y>LDown then
+          LDown:=Y;
+      end;
+    end;
+  end;
+
+  begin
+    Result:=0;
+    //first step: general boundary check
+    if AX=0 then exit;
+    if AY=0 then exit;
+    if AX>BOARD_SIZE then exit;
+    if AY>BOARD_SIZE then exit;
+    //we work on a copy of the board because it's faster than cleaning up the real board
+    New(LBoard);
+    CopyMemory(LBoard,APBoard,sizeof(APBoard^));
+
+    //next step: save the color for comparison
+    LCol:=LBoard.Occupation[AX,AY];
+
+    //now we mark the initial stone and set the initial search boundaries
+    LBoard.Occupation[AX,AY]:=255; //this is our stone marker
+    LTop:=AY;LDown:=AY;
+    LLeft:=AX;LRight:=AX;
+
+    //now the important part:
+    {
+      We now go iteratively over the target rectangle, and mark every
+      neighbour of marked stones, that are unmarked stone
+      When marking a stone, we check if its position leaves
+      the target rectangle, and expand the rect on demand
+      We do this until one iteration nothing was marked, so no stone has an
+      unmarked neighbour, which means the group is completely marked
+    }
+    while true do
+    begin
+      LMarked:=False;
+      for i := LLeft to LRight do
+      begin
+        for j := LTop to LDown do
+        begin
+          //these procedures are setting the LMarked flag!
+          if LBoard.Occupation[i,j] = 255 then
+          begin
+            AddMarkAndExtendRect(i-1,j);
+            AddMarkAndExtendRect(i+1,j);
+            AddMarkAndExtendRect(i,j-1);
+            AddMarkAndExtendRect(i,j+1);
+          end;
+        end;
+      end;
+      if not LMarked then
+        Break;
+    end;
+
+    //now for counting the liberties:
+    {
+    this step is pretty straight forward.
+    We just look for marked liberties in the target rect and count them
+    }
+    for i := LLeft-1 to LRight+1 do
+    begin
+      for j := LTop-1 to LDown+1 do
+      begin
+         if LBoard.Occupation[i,j] = 254 then
+          inc(Result);
+      end;
+    end;
+
+
+    //last step, throw the counting board away
+    Dispose(LBoard);
+  end;
+
   function WouldCaptureAnyThing(AX,AY:SmallInt;APboard:PBoard):SmallInt;
   var lBoard:TBoard;lMarkList:TMarkList;lLen:SmallInt;X,Y:SmallInt;
   begin
@@ -53,28 +219,32 @@ uses Math;
     lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
      X:=AX-1;
      Y:=AY;
-    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+   // if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+    if CountLiberties(X,Y,@LBoard,True) = 0 then
     begin
       Result:=RecmarkgroupSize(x,y,apboard,true);
 
     end;
          X:=AX+1;
      Y:=AY;
-    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+    if CountLiberties(X,Y,@LBoard,True) = 0 then
     begin
       Result:=Result+RecmarkgroupSize(x,y,apboard,true);
 
     end;
           X:=AX;
      Y:=AY-1;
-    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+    if CountLiberties(X,Y,@LBoard,True) = 0 then
     begin
       Result:=Result+RecmarkgroupSize(x,y,apboard,true);
       Exit;
     end;
          X:=AX;
      Y:=AY+1;
-    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+    if CountLiberties(X,Y,@LBoard,True) = 0 then
     begin
       Result:=Result+RecmarkgroupSize(x,y,apboard,true);
       Exit;
@@ -84,11 +254,17 @@ uses Math;
    var lBoard:TBoard;lMarkList:TMarkList;lLen:SmallInt;
    begin
     Result:=False;
-    if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then Exit;
+    //commented this section out
+    //at this path, a move provided has to be always correct!
+    //if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then
+    //begin
+    // Exit;
+    //end;
 
     lBoard:=ApBoard^;
     lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
-    if CountLibertiesRec(LBoard.LastMoveCoordX,LBoard.LastMoveCoordY,@lBoard,True,@lMarkList,lLen,True)= 0 then
+//    if CountLibertiesRec(LBoard.LastMoveCoordX,LBoard.LastMoveCoordY,@lBoard,True,@lMarkList,lLen,True)= 0 then
+    if CountLiberties(lBoard.LastMoveCoordX,lBoard.LastMoveCoordY,@lBoard,True)=0 then
     begin
       Result:=True;
     end;
@@ -103,7 +279,8 @@ uses Math;
       if WouldCaptureLastMove(AX,AY,APBoard) then Exit; //no self atari if capture....
 
       if SimBoard.Occupation[AX,AY]=0 then SimBoard.Occupation[AX,AY]:=AColor;
-      if CountLibertiesRec(AX,AY,@SimBoard,True,@lMarkList,lLen,True)< 2 then
+//      if CountLibertiesRec(AX,AY,@SimBoard,True,@lMarkList,lLen,True)< 2 then
+      if CountLiberties(AX,AY,@SimBoard,True)<2 then
       begin
         Result:=True;
       end;
@@ -147,7 +324,7 @@ uses Math;
       end;
     end;
 
-    function HasLiberties(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean;
+    function HasLiberties_(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean;
     var memFlag:SmallInt;i,j:Integer;
     begin
     Result:=False;
@@ -191,25 +368,25 @@ uses Math;
      if IsEqualField(AX-1,AY,memFlag, APBoard) then
 //   if APBoard.Occupation[AX-1,AY]=memFlag then
      begin
-      Result:=HasLiberties(AX-1,AY,APBoard,False);
+      Result:=HasLiberties_(AX-1,AY,APBoard,False);
      end;
 
      if IsEqualField(AX+1,AY,memFlag, APBoard) then if not Result then
 //     if APBoard.Occupation[AX+1,AY]=memFlag then
      begin
-      Result:= HasLiberties(AX+1,AY,APBoard,False);
+      Result:= HasLiberties_(AX+1,AY,APBoard,False);
      end;
 
      if IsEqualField(AX,AY-1,memFlag, APBoard) then   if not Result then
 //  if APBoard.Occupation[AX,AY-1]=memFlag then
      begin
-      Result:=HasLiberties(AX,AY-1,APBoard,False);
+      Result:=HasLiberties_(AX,AY-1,APBoard,False);
      end;
 
      if IsEqualField(AX,AY+1,memFlag, APBoard) then  if not Result then
 //    if APBoard.Occupation[AX,AY+1]=memFlag then
      begin
-      Result:=HasLiberties(AX,AY+1,APBoard,False);
+      Result:=HasLiberties_(AX,AY+1,APBoard,False);
      end;
     //---------------------------------
     //--CLEAN UP THE MARKERS------------
@@ -449,7 +626,8 @@ end;
     APBoard^.LastMoveCatchedExactlyOne:=False;  //switch back the ko-marker
      if ALLOW_SUICIDE then
      begin
-        If not HasLiberties(AX,AY,APBoard,True) then
+        if CountLiberties(AX,AY,APBoard,True) = 0 then
+       // If not HasLiberties(AX,AY,APBoard,True) then
         begin
           RemCount:= RemoveGroupRec(AX,AY,APBoard,MovesB,MovesW);
            APBoard^.RemovedStones[AColor]:=APBoard^.RemovedStones[AColor]+RemCount;  //keep track of captured stones
@@ -459,7 +637,8 @@ end;
       RemCount:=0;
       If IsEqualField(AX-1,AY,enemyColor,APBoard) then
       begin
-        If not HasLiberties(AX-1,AY,APBoard,True) then
+        if CountLiberties(AX-1,AY,APBoard,True) = 0 then
+//        If not HasLiberties(AX-1,AY,APBoard,True) then
         begin
          RemCount:=RemCount+ RemoveGroupRec(AX-1,AY,APBoard,MovesB,MovesW);
            APBoard^.LastCatchX:=AX-1;
@@ -468,7 +647,8 @@ end;
       end;
       If IsEqualField(AX+1,AY,enemyColor,APBoard) then
       begin
-        If not HasLiberties(AX+1,AY,APBoard,True) then
+        if CountLiberties(AX+1,AY,APBoard,True) = 0 then
+//        If not HasLiberties(AX+1,AY,APBoard,True) then
         begin
          RemCount:= RemCount+RemoveGroupRec(AX+1,AY,APBoard,MovesB,MovesW);
             APBoard^.LastCatchX:=AX+1;
@@ -478,7 +658,8 @@ end;
       end;
       If IsEqualField(AX,AY-1,enemyColor,APBoard) then
       begin
-        If not HasLiberties(AX,AY-1,APBoard,True) then
+        if CountLiberties(AX,AY-1,APBoard,True) = 0 then
+//        If not HasLiberties(AX,AY-1,APBoard,True) then
         begin
          RemCount:=RemCount+ RemoveGroupRec(AX,AY-1,APBoard,MovesB,MovesW);
              APBoard^.LastCatchX:=AX;
@@ -488,7 +669,8 @@ end;
       end;
       If IsEqualField(AX,AY+1,enemyColor,APBoard) then
       begin
-        If not HasLiberties(AX,AY+1,APBoard,True) then
+        if CountLiberties(AX,AY+1,APBoard,True) = 0 then
+//        If not HasLiberties(AX,AY+1,APBoard,True) then
         begin
          RemCount:= RemoveGroupRec(AX,AY+1,APBoard,MovesB,MovesW);
            APBoard^.LastCatchX:=AX;
@@ -531,44 +713,52 @@ end;
 //      If IsEqualField(AX-1,AY,enemyColor,APBoard) then
      if APBoard.Occupation[AX-1,AY]=enemyColor then
       begin
-        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+//        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+        if CountLiberties(AX-1,AY,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX+1,AY,enemyColor,APBoard) then
      if APBoard.Occupation[AX+1,AY]=enemyColor then
       begin
-        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+//        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+          if CountLiberties(AX+1,AY,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX,AY-1,enemyColor,APBoard) then
    if APBoard.Occupation[AX,AY-1]=enemyColor then
       begin
-        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+//        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+        if CountLiberties(AX,AY-1,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX,AY+1,enemyColor,APBoard) then
     if APBoard.Occupation[AX,AY+1]=enemyColor then
       begin
-        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+//        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
+        if CountLiberties(AX,AY+1,APBoard,True) = 1 then Exit;
       end;
     //---------------------------------
     //----NOW CHECK FOR OWN GROUP LIBERTIES----------
 //      If IsEqualField(AX-1,AY,AColor,APBoard) then
    if APBoard.Occupation[AX-1,AY]=AColor then
       begin
-        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+//        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+        if CountLiberties(AX-1,AY,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX+1,AY,AColor,APBoard) then
       if APBoard.Occupation[AX+1,AY]=AColor then
       begin
-        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+//        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+        if CountLiberties(AX+1,AY,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX,AY-1,AColor,APBoard) then
       if APBoard.Occupation[AX,AY-1]=AColor then
       begin
-        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+//        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+        if CountLiberties(AX,AY-1,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX,AY+1,AColor,APBoard) then
     if APBoard.Occupation[AX,AY+1]=AColor then
       begin
-        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+//        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
+          if CountLiberties(AX,AY+1,APBoard,True) > 1 then Exit;
       end;
     //-----------------------------------------------
     // no adjacent liberties
@@ -605,26 +795,36 @@ end;
     Result:=True;
     if not APBoard^.LastMoveCatchedExactlyOne then Exit;
     if (AX<>APBoard^.LastCatchX) or (AY<>APBoard^.LastCatchY) then Exit; //not the spot of the last captured stone-> no ko
-    if CountLibertiesRec(APBoard^.LastMoveCoordX,APBoard^.LastMoveCoordY,APBoard,True,@lMarkedFields,lLen,True)<>1 then Exit ; //no killing-move
+//    if CountLibertiesRec(APBoard^.LastMoveCoordX,APBoard^.LastMoveCoordY,APBoard,True,@lMarkedFields,lLen,True)<>1 then Exit ; //no killing-move
+    if CountLiberties(APBoard^.LastMoveCoordX,APBoard^.LastMoveCoordY,APBoard,True) <> 1 then Exit;
     if RecMarkGroupSize(APBoard^.LastMoveCoordX,APBoard^.LastMoveCoordY,APBoard,True)<>1 then Exit; //if count >1 --> snapback
     //every ko criteria passed, so it's a ko!
     Result := False;
   end;
-  function IsEqualField(AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;
+  function IsEqualField(const AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;
   begin
     //result := False;
-    if AX=0 then begin Result:=False; end else
+   { if AX=0 then begin Result:=False; end else
     if AY=0 then begin Result:=False; end else
     if AX>(BOARD_SIZE) then begin Result:=False; end else
-    if AY>(BOARD_SIZE) then begin Result:=False; end else
+    if AY>(BOARD_SIZE) then begin Result:=False; end else   }
     if (APBoard.Occupation[AX,AY] <> AOccupation) then result:=False else Result:=True;
   end;
 
-  function CountLibertiesRec(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean;MarkedFields:PMarkList;var ALen:SmallInt;AStopAfterTwo:Boolean):SmallInt;
-  var memFlag:SmallInt;i,j:Integer; x,y:Integer;
+  function CountLibertiesRec_(const AX,AY:SmallInt;const APBoard:PBoard;const AFirstCall:Boolean;const MarkedFields:PMarkList;var ALen:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
+  var memFlag:SmallInt;
+      i,j:Integer;
+      x,y:Integer;
+      P:Pointer;
   begin
     Result:=0;
     if AFirstCall then ALen:=-1;
+    if AFirstCall then
+    begin
+      //do a snapshot of the board
+      P:=GetMemory(SizeOf(APBoard^));
+      CopyMemory(P,APBoard,SizeOf(ApBoard^));
+    end;
     //Size of the Group is not important for counting liberties, so only mark liberties here
     if AX=0 then exit;
     if AY=0 then exit;
@@ -703,7 +903,7 @@ end;
                begin
 
 
-                Result:=Result+CountLibertiesRec(AX-1,AY,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
+                Result:=Result+CountLibertiesRec_(AX-1,AY,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
                end;
            end;
            if not (AStopAfterTwo and(Result>1)) then
@@ -713,7 +913,7 @@ end;
              begin
 
 
-              Result:=Result+CountLibertiesRec(AX+1,AY,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
+              Result:=Result+CountLibertiesRec_(AX+1,AY,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
              end;
           end;
       //     if IsEqualField(AX,AY-1,memFlag, APBoard) then
@@ -723,7 +923,7 @@ end;
                begin
 
 
-                Result:=Result+CountLibertiesRec(AX,AY-1,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
+                Result:=Result+CountLibertiesRec_(AX,AY-1,APBoard,False,MarkedFields,ALen,AStopAfterTwo);
                end;
            end;
       //     if IsEqualField(AX,AY+1,memFlag, APBoard) then
@@ -733,30 +933,17 @@ end;
                begin
 
 
-                Result:=Result+CountLibertiesRec(AX,AY+1,APBoard,False,MarkedFields,Alen,AStopAfterTwo);
+                Result:=Result+CountLibertiesRec_(AX,AY+1,APBoard,False,MarkedFields,Alen,AStopAfterTwo);
                end;
            end;
      end;
     //---------------------------------
     //--CLEAN UP THE MARKERS------------
-     if AFirstCall then  // only after every recursion stopped we want to unmark
-     begin
-        for i := 0 to ALen do
-        begin
-           x:=MarkedFields[i][1];
-           y:=MarkedFields[i][2];
-           if APBoard.Occupation[x,y]=255 then APBoard.Occupation[x,y]:=0;
-           if APBoard.Occupation[x,y]=254 then APBoard.Occupation[x,y]:=memFlag;
-          end;
-         { for i := 1 to BOARD_SIZE do
-          begin
-            for j := 1 to BOARD_SIZE do
-            begin
-            if APBoard^.Occupation[i,j]=255 then APBoard^.Occupation[i,j]:=0;
-           if APBoard^.Occupation[i,j]=254 then APBoard^.Occupation[i,j]:=memFlag;
-            end;
-          end;  }
-     end;
+    if AFirstCall then  // only after every recursion stopped we want to unmark
+    begin
+      CopyMemory(APBoard,P,sizeof(APBoard^));  //replace the used board with the snapshot
+      Dispose(P);
+    end;
 
     //----------------------------------
   end;

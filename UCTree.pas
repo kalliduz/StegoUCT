@@ -112,7 +112,7 @@ end;
         Wins:=ARootNode.Childs[i].Content.GetData.WinsWhite
       else
         Wins:=ARootNode.Childs[i].Content.GetData.WinsBlack;
-      CurWR:=Wins/Ply;//    ... /how to Choose best move for playing?=!=!=!=!=!=!ß?!?=!==!
+      CurWR:=Ply;//Wins/Ply;//    ... /how to Choose best move for playing?=!=!=!=!=!=!ß?!?=!==!
       if CurWR>BestWR then
     //  if Ply > ALPHA_AMAF_MINMOVES then
       begin
@@ -213,7 +213,13 @@ begin
   begin
 
     LPly:=FData.WinsWhite+FData.WinsBlack;
+
+    {
+      normal playouts are included here for amaf heuristic in case we don't have
+      amaf playouts yet
+    }
     LPlyAMAF:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF+LPly;
+
     if Assigned(Parent) then
     begin
       LPlyTotal:=Parent.Content.GetData^.WinsWhite+Parent.Content.GetData^.WinsBlack;
@@ -221,12 +227,14 @@ begin
     end
     else
     begin
+      //if this node is rootnode, we just use its own playouts for measurements
       LPlyTotal:=FData.WinsWhite+FData.WinsBlack;
       LPlyAMAFTotal:=FData.WinsWhiteAMAF+FData.WinsBlackAMAF+LPlyTotal;
     end;
 
     if (LPly>0) and (LPlyTotal>0) then
     begin
+
       if FData.FBoard.PlayerOnTurn = 2 then
       begin
         LWins:=FData.WinsWhite;
@@ -241,34 +249,47 @@ begin
 
       if (LPlyAMAF>0) and (LPlyAMAFTotal>0) then
       begin
-        LPlyAMAFUCT:= ((LWinsAMAF/LPlyAMAF)
+        LAMAFWR:=LWinsAMAF/LPlyAMAF; //keep in mind, winrate is adaptive for player here!
+        LPlyAMAFUCT:= (LAMAFWR
           +EXPLORATION_FACTOR_START*
-          Sqrt(Ln(LPlyAMAFTotal)/LPlyAMAF));///(FData.Depth+1);
+          Sqrt(Ln(LPlyAMAFTotal)/LPlyAMAF));
           ///
-        LAMAFWR:=LWinsAMAF/LPlyAMAF;
+
       end else
-        LPlyAMAFUCT:=0;
+        LPlyAMAFUCT:=0; //if we have no playouts, the amaf of course has no value
 
+
+      {
+        this factor marks the influence of AMAF tree warmup.
+        After we got enough "real" playouts on this node,
+        AMAF value has no effect anymore
+      }
       LAlphaAMAFFactor:=(ALPHA_AMAF_MINMOVES - LPly)/ALPHA_AMAF_MINMOVES;
-
-
-
       if LAlphaAMAFFactor<0 then
         LAlphaAMAFFactor:=0;
 
+
+
         LWr:=LWins/LPly;
+        {
+          here we calculate the new winrate based on the influence
+          of the AMAF-factor
+        }
         LWr:=Lwr*(1-LAlphaAMAFFactor)+LAMAFWR*LAlphaAMAFFactor;
+
+
           FData.UCTVal:= (LWr
          +EXPLORATION_FACTOR_START*
-         sqrt(Ln(LPlyTotal)/LPly));///(FData.Depth+1);
+         sqrt(Ln(LPlyTotal)/LPly));;
          ///
 //      if LPlyAMAFUCT > 0 then //if we don't have AMAF data, don't tamper with original playout values!
 //      begin
 //        FData.UCTVal:=FData.UCTVal*(1-LAlphaAMAFFactor) +
 //                      LAlphaAMAFFactor * LPlyAMAFUCT;
 //      end;
-    end else
-      FData.UCTVal:=1000;
+    end
+    else //endif playouts > 0
+      FData.UCTVal:=1000; //we need this to make sure, nodes without playout will be visited first
 
     FData.ISUCTUpToDate:=True;
   end;

@@ -1,13 +1,17 @@
 unit DataTypes;
 
 interface
-  uses Graphics,Classes;
+  uses
+    VCL.Graphics,Classes;
   const
-    BOARD_SIZE=9;
+    BOARD_SIZE=5;
     SIMULATIONS=3000;
     UCT_BESTMOVE = 1;
 //    ALPHA_AMAF_FACTOR = 0.1;
+
+ // amaf value for a node decreases linear until this node was played out X times
     ALPHA_AMAF_MINMOVES = 2000;
+
     UCT_NORMALMOVE = (BOARD_SIZE*BOARD_SIZE);
    // MC_TRUNK=BOARD_SIZE*BOARD_SIZE*1000000;
     DYN_KOMI=6.5;
@@ -27,7 +31,7 @@ interface
     BOARDER_HEURISTIC_FACTOR =1;
     TENUKI_PREVENT_HEURISTIC_FACTOR=1;
 
-    MAX_MEMORY = 1473741824;
+    MAX_MEMORY = 1473741824; //2GB
 
     MAX_PRUNE_TREE_PRESERVE=10; //minimum variations preservered in every node of the tree
     MIN_DEPTH_FORCED_PRUNE=5; //specifies the minimum depth at which the tree is forcefully cut if
@@ -48,6 +52,7 @@ type
     MoveNr:Integer;
     Occupation: array[0..BOARD_SIZE+1,0..BOARD_SIZE+1] of SmallInt; //0 = empty, 1 = white, 2 = black;
   end;
+
   TGameInformation = record
     MemoryUsed:Int64;
     MaxMemory:Int64;

@@ -54,6 +54,11 @@ begin
   Result:=False;
    if Terminated then
    Exit;
+   if AParent.Content.Data.FBoard.Over then
+   begin
+     AParent.Content.Data.HasAllChilds:=True;
+     Exit;
+   end;
    if AParent.Content.Data.HasAllChilds then
     Exit; //no more submoves to simulate here
 
@@ -95,12 +100,12 @@ begin
    FUCtree.SetPointers(LUCTNode);
    LNode:=AParent.AddChild(LUctNode);
    LUctNode.Parent:=AParent;
-   for i := 1 to 100 do
+ {  for i := 1 to 1 do
    begin
     LWhiteWin:=PlayoutNode(LPUCTData);
     FUCTree.UpdatePlayout(LNode,LWhiteWin,True);
     FUCTree.UpdateAllAMAFSiblings(LNode,FUCTree.RootNode,LWhiteWin);
-   end;
+   end;   }
 
    LUctNode.CalculateUCTValue;
 
@@ -172,19 +177,19 @@ begin
    end;
    if not LSuccess then
    begin
-//      if not LBoard.Over then
-//      if not FUCTree.DoesNodeHaveChild(AParent,0,0) then
-//      begin
-//        LX:=0;
-//        LY:=0;
-//        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False,LMoveList1,LMoveList2);
-//      end
-//      else
-//      begin
+      if  (not LBoard.Over) AND
+          (not FUCTree.DoesNodeHaveChild(AParent,0,0)) then
+      begin
+        LX:=0;
+        LY:=0;
+        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False,LMoveList1,LMoveList2);
+      end
+      else
+      begin
         AParent.Content.Data.HasAllChilds:=True;
         Exit;
-//        Exit; //if two players passed, nothing more to do here.
-//      end;
+        Exit; //if two players passed, nothing more to do here.
+      end;
    end;
    LPUCTData.X:=LX;
    LPUCTData.Y:=lY;
@@ -207,7 +212,7 @@ begin
    FUCtree.SetPointers(LUCTNode);
    LNode:=AParent.AddChild(LUctNode);
    LUctNode.Parent:=AParent;
-   for i := 1 to 10 do
+   for i := 1 to 1 do
    begin
     LWhiteWin:=PlayoutNode(LPUCTData);
     FUCTree.UpdatePlayout(LNode,LWhiteWin,True);
@@ -292,7 +297,7 @@ end;
         Exit;
       inc(i);
 
-       LHighestNode:=FUCTree.RootNode.GetHighestDirectChild;
+       LHighestNode:=FUCTree.RootNode.GetHighestDirectChild(False);
        LLast:=LHighestNode;
 
 
@@ -302,13 +307,25 @@ end;
           if Assigned(LHighestNode) then
             AddRandomSubNode(LHighestNode);
 
+          LHighestNode:=LHighestNode.GetHighestDirectChild(LHighestNode.Content.Data.HasAllChilds);//not LHighestNode.Content.Data.HasAllChilds);
+
+          {  if Assigned(LHighestNode) then
+            AddRandomSubNode(LHighestNode);
           LHighestNode:=LHighestNode.GetHighestDirectChild(not LHighestNode.Content.Data.HasAllChilds);
 
+            if Assigned(LHighestNode) then
+            AddRandomSubNode(LHighestNode);
+          LHighestNode:=LHighestNode.GetHighestDirectChild(not LHighestNode.Content.Data.HasAllChilds);
+          }
           // --> if this node already has all moves set, he should not consider himself for exploitation, but give it to a child
          if (LLast = LHighestNode)or (LHighestNode = nil)  then Break;
+
          LLast :=LHighestNode;
        end;
-       LHighestNode:=LLast; //after executing, roll it back to the last safe node
+       if LHighestNode = nil then
+       begin
+        LHighestNode:=LLast; //after executing, roll it back to the last safe node
+       end;
 //        for i := 1 to BOARD_SIZE do
 //        begin
 //          for j := 1 to BOARD_SIZE do
@@ -329,7 +346,8 @@ end;
 //        AddRandomSubNode(LHighestNode);
 
 
-             if LHighestNode.Content.Data.HasAllChilds then //if we got to simulate all positions until depth 3
+           //  if LHighestNode.Content.Data.HasAllChilds then //if we got to simulate all positions until depth 3
+             for i := 1 to 100 do
              begin
                 LHighestNode:=FUCTree.GetRandomLeaf;
                 LWhiteWin:=PlayoutNode(LHighestNode.Content.Data);

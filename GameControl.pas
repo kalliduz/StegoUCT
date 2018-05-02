@@ -192,7 +192,7 @@ implementation
     FGameStatus.LastMoveTime:=Now;
   end;
   procedure TGameManager.MoveNow(X,Y:SmallInt);
-  var dummy1,dummy2:TMoveList;
+  var dummy1,dummy2:TMoveList; l:SmallInt;
   begin
     DestroyThreads;
     ExecuteMove(X,Y,
@@ -205,6 +205,9 @@ implementation
     CalculateNewTime;
    // UseOldUCTAt(X,Y);
     CreateThreads;
+    l:=0;
+//   raise  Exception.Create(inttostr(CountLiberties(X,Y,@FBoard,True)));
+
   end;
   procedure TGameManager.ComputerMoveNow;
   var x,y:SmallInt;dummy1,dummy2:TMoveList;
