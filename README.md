@@ -1,6 +1,13 @@
 # StegoUCT
 Simple Go Engine using MonteCarlo,UCT and AMAF/RAVE written in Delphi. GTP compatible. AI Heuristics planned
 
+Important note:
+---------------
+
+This project is still in a very early development stage and can be considered not much more than a proof of concept.
+Major reworks and breaking changes in the API may happen!
+
+
 What is MonteCarlo?
 -------------------
 
