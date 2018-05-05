@@ -61,10 +61,21 @@ TGameManager=class
     procedure SetInfoDisplay(ADisplay:TImage);
     procedure PlaceStone(X,Y:SmallInt;AColor:SmallInt);  //does not reset timing and can be any color at any place
     procedure GetLastMove(var X:SmallInt;var Y:SmallInt);
+    function AquireTree:TUCTree;
+    procedure ReleaseTree;
     function ShouldResign:Boolean;
 end;
 
 implementation
+    function TGameManager.AquireTree:TUCTree;
+    begin
+      Result:=FThinkThread.Tree;
+      FThinkThread.Suspend;
+    end;
+    procedure TGameManager.ReleaseTree;
+    begin
+      FThinkThread.Resume;
+    end;
     procedure TGameManager.DestroyThreads;
     begin
       FThinkThread.Free;

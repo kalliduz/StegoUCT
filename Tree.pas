@@ -3,6 +3,7 @@ unit Tree;
 interface
 uses
   System.Classes,
+  System.Math,
   System.Generics.Defaults,
   System.Generics.Collections;
 type
@@ -36,6 +37,7 @@ type
     function GetHighestDirectChild(const AIncludeSelf:Boolean = True):TTreeNode<T>;
     function CompareTo(ATreeNode:TTreeNode<T>):Integer;
     function AddChild(AData:T):TTreeNode<T>;
+    function GetMaxDepth:Int64;
     function NodeCount:Int64;
 
     constructor Create(AData:T;AParent:TTreeNode<T>);
@@ -47,7 +49,6 @@ type
     FRootNode:TTreeNode<T>;
     FNodeCount:Int64;
     FMemoryUsed:Int64; //in bytes
-    FMaxDepth:Int64;
 
   public
     constructor Create(ARootNodeData:T);
@@ -96,6 +97,24 @@ end;
  end;
  {$ENDREGION}
 {$REGION ' TTreeNode Implementation'}
+ function TTreeNode<T>.GetMaxDepth:Int64;
+ var
+  i:Integer;
+ begin
+   if ChildCount = 0 then
+   begin
+     Result:=FDepth;
+   end else
+   begin
+      Result:=0;
+     for i := 0 to ChildCount-1 do
+     begin
+
+
+      Result:=Max(Result,Childs[i].GetMaxDepth);
+     end;
+   end;
+ end;
  function TTreeNode<T>.NodeCount:Int64;
  var
   i:Integer;

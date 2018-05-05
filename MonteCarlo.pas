@@ -116,6 +116,8 @@ implementation
           //-------------ANTI SELF ATARI POLICY END---------------------
 
           //-----------CATCH STONE IF YOU CAN POLICY-------------------------
+
+
 //          if random((WouldCaptureAnyThing(x,y,APSimBoard)*5)+1)=0  then
           begin
 
@@ -142,7 +144,7 @@ implementation
               X:=ApSimBoard.LastMoveCoordX;
               Y:=ApSimBoard.LastMoveCoordY+1;
             end;
-          end;  }
+          end; }
           //-----------CATCH STONE IF YOU CAN POLICY END-------------------------
           //--------------LOCAL MOVE POLICY----------------
 //          if random(3)=0 then //prefer local answer
@@ -178,7 +180,8 @@ implementation
 //          end;
           end;
           //--------LOCAL MOVE POLICY END----------------------
-          ExecuteMove (x,y,APSimBoard^.PlayerOnTurn,APSimBoard,False,False,movesB,MovesW); //else
+          if random(2+WouldCaptureAnyThing(x,y,APSimBoard))>0 then
+            ExecuteMove (x,y,APSimBoard^.PlayerOnTurn,APSimBoard,False,False,movesB,MovesW); //else
 
 
                   //  begin

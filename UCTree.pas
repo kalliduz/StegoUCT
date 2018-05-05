@@ -30,6 +30,7 @@ type
 
   TUCTNode = class(TInterfacedObject,ICompareableData)
   private
+
     FData:PUCTData;
     FParent:TTreeNode<TUCTNode>;
     function GetData:PUCTData;
@@ -45,6 +46,8 @@ type
 
   TUCTree = class(TTree<TUCTNode>)
   private
+    FMovesCountOnDepth:Array[0..MAX_TREE_DEPTH-1] of Int64;
+    FMovesCountOnDepthAMAF:Array[0..MAX_TREE_DEPTH-1] of Int64;
     FWinsWhiteTotal:Int64;
     FWinsBlackTotal:Int64;
   public
@@ -112,7 +115,7 @@ end;
         Wins:=ARootNode.Childs[i].Content.GetData.WinsWhite
       else
         Wins:=ARootNode.Childs[i].Content.GetData.WinsBlack;
-      CurWR:=Ply;//Wins/Ply;//    ... /how to Choose best move for playing?=!=!=!=!=!=!ß?!?=!==!
+      CurWR:=Ply ;//   ... /how to Choose best move for playing?=!=!=!=!=!=!ß?!?=!==!
       if CurWR>BestWR then
     //  if Ply > ALPHA_AMAF_MINMOVES then
       begin
@@ -143,7 +146,13 @@ begin
    LPUCTData:=nil;
   end;
   LPUCTData:=ANode.Content.GetData;
-
+  {
+    We update the statistic here to get the value for AMAF total playouts after N-th move
+  }
+  if not AIsAMAFUPdate then
+    FMovesCountOnDepth[ANode.Depth]:=FMovesCountOnDepth[ANode.Depth]+1
+  else
+    FMovesCountOnDepthAMAF[ANode.Depth]:=FMovesCountOnDepthAMAF[ANode.Depth]+1;
   if AIsWinWhite then
   begin
     if AIsAMAFUPdate then
@@ -275,12 +284,16 @@ begin
           here we calculate the new winrate based on the influence
           of the AMAF-factor
         }
+        if  FData.Depth = 1 then
+        begin
+          LWr:=LWr+0;
+        end;
         LWr:=Lwr*(1-LAlphaAMAFFactor)+LAMAFWR*LAlphaAMAFFactor;
 
 
           FData.UCTVal:= (LWr
          +EXPLORATION_FACTOR_START*
-         sqrt(Ln(LPlyTotal)/LPly));;
+         sqrt(Ln(LPlyTotal)/(LPly*5)));
          ///
 //      if LPlyAMAFUCT > 0 then //if we don't have AMAF data, don't tamper with original playout values!
 //      begin
@@ -289,7 +302,7 @@ begin
 //      end;
     end
     else //endif playouts > 0
-      FData.UCTVal:=1000; //we need this to make sure, nodes without playout will be visited first
+      FData.UCTVal:=10000000+ Random(1000); //we need this to make sure, nodes without playout will be visited first
 
     FData.ISUCTUpToDate:=True;
   end;

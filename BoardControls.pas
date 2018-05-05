@@ -770,7 +770,10 @@ end;
   function IsValidMove(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
   begin
     Result := False;
+     if (AX=0) and (AY=0) then
+      Exit(True); //ofcourse passing is always valid.....gnarf
     //-----OUT OF BOUNDS-------
+
     if AX=0 then exit;
     if AY=0 then exit;
     if AX>BOARD_SIZE then exit;
