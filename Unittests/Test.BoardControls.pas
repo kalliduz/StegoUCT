@@ -1,5 +1,13 @@
 unit Test.BoardControls;
+{
+  These unittests are designed to work with any squared board
+  which is at least 5x5
 
+  Smaller boards may result in unexpected behaviour!
+
+  Bigger boards should always pass too!
+
+}
 interface
 uses
   DUnitX.TestFramework,
@@ -22,9 +30,151 @@ type
 
     [Test]
     procedure TestReverseColor;
+
+    [Test]
+    procedure TestWouldCaptureAnyThing;
+
+    [Test]
+    procedure TestCountLiberties;
+
+    [Test]
+    procedure TestIsSelfAtari;
   end;
 
 implementation
+procedure TTestBoardControls.TestWouldCaptureAnyThing;
+var
+  LX,LY:Integer;
+  LBoard:TBoard;
+  LResult:Boolean;
+  i,j:Integer;
+begin
+  {
+    initialize the board
+  }
+  ResetBoard(@LBoard);
+
+  {
+    place white stone in corner, one black as neighbour
+    then test to place the other white to capture.
+    with player white this should be false
+  }
+  LBoard.Occupation[1,1]:=1;
+  LBoard.Occupation[1,2]:=2;
+  LX:=2;
+  LY:=1;
+  LBoard.PlayerOnTurn:=1;
+  LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
+  Assert.IsFalse(LResult);
+  {
+    Now we just set the player as white, and capturing should return true now
+  }
+  LBoard.PlayerOnTurn:=2;
+  LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
+  Assert.IsTrue(LResult);
+
+  {
+    now we fill the board completely white, except for one free eye
+    as black player, this would capture everything, so should return true
+  }
+  for i := 1 to BOARD_SIZE do
+  begin
+    for j := 1 to BOARD_SIZE do
+    begin
+      LBoard.Occupation[i,j]:=1;
+    end;
+  end;
+  LBoard.Occupation[2,2]:=0;
+  LX:=2;
+  LY:=2;
+  LBoard.PlayerOnTurn:=2;
+  LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
+  Assert.IsTrue(LResult);
+  {
+    now we free a second eye for the big white group.
+    placing a black stone now won't capture anything
+  }
+  LBoard.Occupation[4,4]:=0;
+  LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
+  Assert.IsFalse(LResult);
+
+end
+
+;
+procedure TTestBoardControls.TestCountLiberties;
+var
+  LBoard:TBoard;
+  LLiberties:Integer;
+  i,j:Integer;
+  LCompareBoard:TBoard;
+begin
+  ResetBoard(@LBoard);
+  {
+    simple check for two connected stones = 6 liberties
+  }
+  LBoard.Occupation[3,3]:=1;
+  LBoard.Occupation[3,4]:=1;
+  {
+    we save the board for later
+  }
+  Move(LBoard,LCompareBoard,sizeof(TBoard));
+
+  LLiberties:=CountLiberties(3,3,@LBoard,false);
+  Assert.AreEqual(6,LLiberties);
+
+  {
+    since this function is using the actual board for counting,
+    we also need to check if no changes were made to the board
+  }
+    Assert.AreEqualMemory(@LCompareBoard,@LBoard,sizeof(TBoard));
+
+
+
+end;
+
+procedure TTestBoardControls.TestIsSelfAtari;
+var
+  LBoard:TBoard;
+  TestResult:Boolean;
+begin
+  ResetBoard(@LBoard);
+  {
+    first we test the classic one stone in corner self atari
+  }
+  LBoard.Occupation[1,2]:=1;
+  TestResult:=IsSelfAtari(1,1,2,@LBoard);
+  Assert.IsTrue(TestResult);
+
+  {
+    now we swap the color of the neighbour stone instead
+    should be no self atari then
+  }
+
+  LBoard.Occupation[1,2]:=2;
+  TestResult:=IsSelfAtari(1,1,2,@LBoard);
+  Assert.IsFalse(TestResult);
+
+  {
+    now we do normal tiger-mouth shape
+    white tigermouth should be self atari for black stone
+  }
+
+  ResetBoard(@LBoard);
+  LBoard.Occupation[3,2]:=1;
+  LBoard.Occupation[4,3]:=1;
+  LBoard.Occupation[3,4]:=1;
+  TestResult:=IsSelfAtari(3,3,2,@LBoard);
+  Assert.IsTrue(TestResult);
+
+  {
+    now we just set a white stone in the white tigermouth
+    should be no selfatari
+  }
+  TestResult:=IsSelfAtari(3,3,1,@LBoard);
+  Assert.IsFalse(TestResult);
+
+
+end;
 
 procedure TTestBoardControls.TestIsSuicide;
 var
