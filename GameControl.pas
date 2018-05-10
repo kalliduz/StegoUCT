@@ -1,7 +1,7 @@
 unit GameControl;
 
 interface
-uses DataTypes,Dialogs,UCTreeThread,UCTree,BoardControls,Display,ExtCtrls,DateUtils,SysUtils;
+uses DataTypes,VCL.Dialogs,UCTreeThread,UCTree,BoardControls,Display,VCL.ExtCtrls,DateUtils,SysUtils;
 
 type
 TTimeSetting=record
@@ -70,14 +70,18 @@ implementation
     function TGameManager.AquireTree:TUCTree;
     begin
       Result:=FThinkThread.Tree;
-      FThinkThread.Suspend;
+      FThinkThread.Suspended:=True;
     end;
     procedure TGameManager.ReleaseTree;
     begin
-      FThinkThread.Resume;
+      FThinkThread.Suspended:=False;
     end;
     procedure TGameManager.DestroyThreads;
     begin
+      if not Assigned(FThinkThread) then
+        Exit;
+      FThinkThread.Terminate;
+      FThinkThread.WaitFor;
       FThinkThread.Free;
       FThinkThread:=nil;
     end;
@@ -104,8 +108,7 @@ implementation
   begin
     FDisplayTimer.Free;
     FThinkTimer.Free;
-    StopThreads;
-    FThinkThread.Destroy;
+    DestroyThreads;
     inherited Destroy;
   end;
   procedure TGameManager.GetLastMove(var X:SmallInt;var Y:SmallInt);
@@ -133,19 +136,16 @@ implementation
   end;
 
   procedure TGameManager.PlaceStone(X,Y:SmallInt;AColor:SmallInt);
-  var dummy1,dummy2:TMoveList;
   begin
-    StopThreads;
+    DestroyThreads;
     ExecuteMove(X,Y,
                 AColor,
                 @FBoard,
                 (X=0)AND(Y=0), //passmove criterium
-                False,
-                dummy1,dummy2
+                False
                 );
     CalculateNewTime;
-    NewUCT;
-    StartThreads;
+    CreateThreads;
   end;
   procedure TGameManager.DisplayClicked(X,Y:Integer);
   var lx,ly:Integer;
@@ -203,57 +203,48 @@ implementation
     FGameStatus.LastMoveTime:=Now;
   end;
   procedure TGameManager.MoveNow(X,Y:SmallInt);
-  var dummy1,dummy2:TMoveList; l:SmallInt;
+  var l:SmallInt; Lx,Ly:Integer;
   begin
+    if not Assigned(FThinkThread) then
+      Exit;
+
+    CalculateNewTime;
+    StopThreads;
+    StartThreads;
     DestroyThreads;
-    ExecuteMove(X,Y,
+   if not ExecuteMove(X,Y,
                 FBoard.PlayerOnTurn,
                 @FBoard,
                 (X=0)AND(Y=0), //passmove criterium
-                False,
-                dummy1,dummy2
-                );
+                False
+                ) then
+   ShowMessage('Invalid Move');
     CalculateNewTime;
    // UseOldUCTAt(X,Y);
     CreateThreads;
-    l:=0;
 //   raise  Exception.Create(inttostr(CountLiberties(X,Y,@FBoard,True)));
 
   end;
   procedure TGameManager.ComputerMoveNow;
-  var x,y:SmallInt;dummy1,dummy2:TMoveList;
+  var x,y:SmallInt;
   begin
 
     if not Assigned(FThinkThread) then Exit;
 
+    //StopThreads;
     if FBoard.LastPlayerPassed then
     begin
-      StopThreads;
-      ExecuteMove(FThinkThread.BestX,FThinkThread.BestY,
-                  FBoard.PlayerOnTurn,
-                  @FBoard,
-                  true, //passmove criterium
-                  False,
-                  dummy1,dummy2
-
-               );
+      x:=0;
+      y:=0;
     end
     else
     begin
-      X:=FThinkThread.BestX;
-      Y:=FThinkThread.BestY;
-      StopThreads;
-      ExecuteMove(X,Y,
-                  FBoard.PlayerOnTurn,
-                  @FBoard,
-                  (X=0)AND(Y=0), //passmove criterium
-                  False,
-                  dummy1,dummy2
-                  );
+      x:=FThinkThread.BestX;
+      y:=FThinkThread.BestY;
     end;
+   // StartThreads;
     CalculateNewTime;
     MoveNow(X,Y);
-    StartThreads;
   end;
   procedure TGameManager.OnThinkTimer(Sender:TObject);
   begin
@@ -270,16 +261,14 @@ implementation
   end;
 
   procedure TGameManager.StartThreads;
-  var i:integer;
   begin
-     FThinkThread.Resume;
+     FThinkThread.Suspended:=false;
   end;
 
   procedure TGameManager.StopThreads;
-  var i:integer;
   begin
     if Assigned(FThinkThread) then
-      FThinkThread.Suspend;
+      FThinkThread.Suspended:=True;
   end;
 
   procedure TGameManager.OnDisplayTimer(Sender:TObject);
@@ -292,7 +281,7 @@ implementation
 //    child:=nil;
     if Assigned(FThinkThread) then
     begin
-      X:=0;Y:=0;
+      StopThreads;
       tmp:=FThinkThread.AllPlayouts;
       gameInfo.PlyPerSec:=round((tmp-FLastPlayouts)*(1000/FDisplayTimer.Interval));
       FLastPlayOuts:=tmp;
@@ -309,7 +298,7 @@ implementation
       gameInfo.PlayoutsAll:=FThinkThread.AllPlayouts;
 
       gameInfo.BestResponseWinrate:=-1; //TODO Implement
-
+      StartThreads;
       if Assigned(FAssignedInfoDisplay) then
         DisplayGameInformation(gameInfo,FAssignedInfoDisplay);
     end;
@@ -338,12 +327,11 @@ implementation
   end;
 
   procedure TGameManager.NewGame(AMainTimeBlack,AMainTimeWhite,AByoTime,AByoPeriods:Integer;ACompWhite,ACompBlack:Boolean);
-    var i:Integer;
   begin
-    StopThreads;
+    DestroyThreads;
+
     ResetBoard(@FBoard);
-    if Assigned(FThinkThread) then FreeAndNil(FThinkThread);
-    FThinkThread:=TUCTreeThread.Create(FBoard);
+
     FGameStatus.TimeWhite.MainTime:=AMainTimeWhite;
     FGameStatus.TimeWhite.ByoLength:=AByoTime;
     FGameStatus.TimeWhite.ByoPeriods:=AByoPeriods;
@@ -356,7 +344,7 @@ implementation
     FGameStatus.CompWhite:=ACompWhite;
     FGameStatus.CompBlack:=ACompBlack;
     FGameStatus.LastMoveTime:=Now;
-    StartThreads;
+    CreateThreads;
 
   end;
   constructor TGameManager.Create();
@@ -366,7 +354,7 @@ implementation
     FDisplayRatingOverlay:=False;
     FThinkThread:=nil;
     FDisplayTimer:=TTimer.Create(nil);
-    FDisplayTimer.Interval:=100;
+    FDisplayTimer.Interval:=500;
     FDisplayTimer.OnTimer:=OnDisplayTimer;
     FThinkTimer:=TTimer.Create(nil);
     FThinkTimer.Interval:=10;

@@ -57,10 +57,10 @@ type
                               const AOnlyFirstLevel:Boolean = True;
                               const InitialWR:Double = 0
                               ):TTreeNode<TUCTNode>;
-      function UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean):Boolean;
+      function UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean;const AAmount:Integer=1):Boolean;
 
                                                         // Maybe a "key" value in the treenode
-    procedure UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
+    procedure UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1);
     constructor Create(ARootNodeData:TUCTNode);reintroduce;
   end;
 
@@ -70,7 +70,7 @@ begin
   FreeData;
   inherited Destroy;
 end;
- function TUCTree.UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean):Boolean;
+ function TUCTree.UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean;const AAmount:Integer=1):Boolean;
 var
   i:Integer;
 begin
@@ -84,10 +84,10 @@ begin
         ARootNode.Content.GetData.FBoard.PlayerOnTurn) and
         (ARootNode.Depth<3) //if updated
     then
-      UpdatePlayout(ARootNode,AIsWhiteWin,True,True);
+      UpdatePlayout(ARootNode,AIsWhiteWin,True,True,AAmount);
   end;
   for i := 0 to ARootNode.ChildCount-1 do
-    UpdateAllAMAFSiblings(AAMAFNode,ARootNode.Childs[i],AIsWhiteWin);
+    UpdateAllAMAFSiblings(AAMAFNode,ARootNode.Childs[i],AIsWhiteWin,AAmount);
 end;
 constructor TUCTree.Create(ARootNodeData:TUCTNode);
 begin
@@ -135,7 +135,7 @@ begin
   ANodeData.Data.WinsBlackTotal:=@FWinsBlackTotal;
 end;
 
-procedure TUCTree.UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false);
+procedure TUCTree.UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1);
 var
   LPUCTData:PUCTData;
 begin
@@ -156,16 +156,16 @@ begin
   if AIsWinWhite then
   begin
     if AIsAMAFUPdate then
-      Inc(LPUCTData.WinsWhiteAMAF)
+      Inc(LPUCTData.WinsWhiteAMAF,AAmount)
     else
-      inc(LPUCTData.WinsWhite);
+      inc(LPUCTData.WinsWhite,AAmount);
   end
   else
   begin
     if AIsAMAFUPdate then
-      Inc(LPUCTData.WinsBlackAMAF)
+      Inc(LPUCTData.WinsBlackAMAF,AAmount)
     else
-      Inc(LPUCTData.WinsBlack);
+      Inc(LPUCTData.WinsBlack,AAmount);
 
   end;
 
@@ -173,13 +173,13 @@ if AIsInitialNode then
 if not AIsAMAFUPdate then //don't count AMAF playouts as totals
 begin
    if AIsWinWhite then
-      Inc(LPUCTData.WinsWhiteTotal^)
+      Inc(LPUCTData.WinsWhiteTotal^,AAmount)
    else
-      Inc(LPUCTData.WinsBlackTotal^);
+      Inc(LPUCTData.WinsBlackTotal^,AAmount);
 end;
   Anode.Content.GetData.ISUCTUpToDate:=False;
   ANode.Content.CalculateUCTValue;
-  UpdatePlayout(ANode.Parent,AIsWinWhite,False,AIsAMAFUPdate);
+  UpdatePlayout(ANode.Parent,AIsWinWhite,False,AIsAMAFUPdate,AAmount);
 
 end;
 
@@ -260,7 +260,7 @@ begin
       begin
         LAMAFWR:=LWinsAMAF/LPlyAMAF; //keep in mind, winrate is adaptive for player here!
         LPlyAMAFUCT:= (LAMAFWR
-          +EXPLORATION_FACTOR_START*
+          +EXPLORATION_FACTOR*
           Sqrt(Ln(LPlyAMAFTotal)/LPlyAMAF));
           ///
 
@@ -292,8 +292,8 @@ begin
 
 
           FData.UCTVal:= (LWr
-         +EXPLORATION_FACTOR_START*
-         sqrt(Ln(LPlyTotal)/(LPly*5)));
+         +EXPLORATION_FACTOR*
+         sqrt(Ln(LPlyTotal)/(LPly)));
          ///
 //      if LPlyAMAFUCT > 0 then //if we don't have AMAF data, don't tamper with original playout values!
 //      begin

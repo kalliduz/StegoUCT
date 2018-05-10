@@ -1,193 +1,416 @@
 unit MonteCarlo;
 
 interface
-uses DataTypes,BoardControls,SysUtils;
+uses DataTypes,BoardControls,SysUtils,Types;
   const
   Directions : array [1..8,1..2] of SmallInt =((1,0),(1,1),(1,-1),(0,1),(0,-1),(-1,0),(-1,1),(-1,-1));
-  function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double):SmallInt;
 
-// TODO:
-// - Optimize CleanMoveList and compare to GetMoveList (error if not equal)
-//    -->temporary solution with random movelist-update via GetMoveList-Call
-// ALGORITHM OPTIMIZATIONS! (NOW: 9x9 6kGames/Sec  GOAL: 40kGames/sec)
-// Light vs Heavy Playouts? Think about balance!
-//Implement automatic 3x3-pattern-builder(rate by monte-carlo playouts/UCT-Playouts?)
+type
+  TMoveEntry = record
+    X:SmallInt;
+    Y:SmallInt;
+    Probability:Double;
+  end;
+  THeuristic = class
+  private
+  public
+    class function GetHeuristicFactor(const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;virtual;abstract;
+  end;
+
+
+  {
+    this heuristic rates moves higher, if they would capture enemy stones
+  }
+  TCaptureHeuristic = class(THeuristic)
+  private
+  public
+     class function GetHeuristicFactor(const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;override;
+
+  end;
+
+  {
+    this heuristic rates moves lower, if they are a self atari
+  }
+  TAntiSelfAtariHeuristic = class(THeuristic)
+  private
+  public
+    class function GetHeuristicFactor (const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;override;
+
+  end;
+
+  {
+    This heuristic rates moves higher, if they free a group from atari
+  }
+  TRunAwayHeuristic = class(THeuristic)
+  private
+  public
+    class function GetHeuristicFactor (const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;override;
+  end;
+
+  THeuristicClass = class of THeuristic;// function (const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;
+
+  TPlayerMoveList = array[0..BOARD_SIZE*BOARD_SIZE ]of TMoveEntry;
+
+  TMoveGenerator = class
+  private
+    FRegisteredHeuristics:array of THeuristicClass;
+    FPlayerMoveLists:array[1..2] of TPlayerMoveList;
+    FMoveCounts:array[1..2] of Integer;
+    FAssignedBoard:PBoard;
+    FProbabilityList:array of Integer;
+    procedure RemoveIndex(const AIndex:Integer;const APlayer:SmallInt);
+    procedure PreparePropabilityList(const APlayer:SmallInt);
+    procedure ApplyHeuristics(const APlayer:SmallInt);
+  public
+    procedure RebuildList(const APlayer:SmallInt);
+    procedure RegisterHeuristic(const AHeuristic:THeuristicClass);
+    property AssignedBoard:PBoard read FAssignedBoard write FAssignedBoard;
+    function PopRandomHeuristicItem(const APlayer:SmallInt):TPoint;
+    function PopRandomItem(const APlayer:SmallInt):TPoint;
+    destructor Destroy;
+    constructor Create;
+  end;
+
+
+  function PlayoutPosition(const ABoard:PBoard;out Score:Double):SmallInt;
+
+
 implementation
+destructor TMoveGenerator.Destroy;
+begin
+  inherited Destroy;
+end;
+
+  class function TAntiSelfAtariHeuristic.GetHeuristicFactor(const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;
+  begin
+    if IsSelfAtari(AX,AY,AColor,ABoard) then
+    begin
+      Result:=0.2;
+    end else
+      Result:=1;
+  end;
+
+  class function TCaptureHeuristic.GetHeuristicFactor(const ABoard:PBoard;const AX,AY:SmallInt;const AColor:SmallInt):Double;
+  begin
+
+    if  WouldCaptureAnyThing(AX,AY,ABoard) then
+      Result:=10
+    else
+      Result:=1;
+
+  end;
+
+  constructor TMoveGenerator.Create;
+  begin
+    RegisterHeuristic(TAntiSelfAtariHeuristic);
+    RegisterHeuristic(TCaptureHeuristic);
+    RegisterHeuristic(TRunAwayHeuristic);
+  end;
+
+  procedure TMoveGenerator.ApplyHeuristics(const APlayer:SmallInt);
+  var
+    i,j:Integer;
+    LX,LY:Integer;
+    LFactor:Double;
+  begin
+    {
+      here we just iterate over all possible moves, and call all
+      heuristic factor calculations for every move.
+      the we write back the product of these for every move.
+      Et voila, we have nice probabilities :)
+    }
+    for i := 0 to FMoveCounts[APlayer]-1 do
+    begin
+      LFactor:=1;
+      LX:=FPlayerMoveLists[APlayer][i].X;
+      LY:=FPlayerMoveLists[APlayer][i].Y;
+      for j := 0 to length(FRegisteredHeuristics)-1 do
+      begin
+        LFactor:=LFactor*FRegisteredHeuristics[j].GetHeuristicFactor(FAssignedBoard,LX,LY,APlayer);
+      end;
+      FPlayerMoveLists[APlayer][i].Probability:=LFactor;
+    end;
+
+  end;
+
+  procedure TMoveGenerator.RegisterHeuristic(const AHeuristic:THeuristicClass);
+  begin
+    setlength(FRegisteredHeuristics,length(FRegisteredHeuristics)+1);
+    FRegisteredHeuristics[Length(FRegisteredHeuristics)-1]:=AHeuristic;
+  end;
+
+  procedure TMoveGenerator.RemoveIndex(const AIndex:Integer;const APlayer:SmallInt);
+  var
+    len:Integer;
+  begin
+    len:=FMoveCounts[APlayer];
+    FplayerMoveLists[APlayer][AIndex]:=FplayerMoveLists[APlayer][len-1];
+    dec(FMoveCounts[APlayer]);
+  end;
+
+  procedure TMoveGenerator.PreparePropabilityList(const APlayer:SmallInt);
+  var
+    i,j:Integer;
+    LIndex:Integer;
+  begin
+    LIndex:=-1;
+    setlength(FProbabilityList,0);
+    {
+      With this algorithm, we generate a O(1) lookup table
+      for moves with different probabilities.
+      Lets assume, we have Moves M(i):
+      M(0).Probability = 1
+      M(1).Probability = 3
+      M(2).Probability = 2
+
+      Then we generate an array:
+      [0,1,1,1,2,2]
+      which represents the probability of every move
+
+      The only drawback is possible memory consumption when working with
+      high probabilites and the problem of missing granularity.
+      But for our case, this should fit.
+    }
+    for i := 0 to FMoveCounts[APlayer]-1 do
+    begin
+      for j := 0 to round(FPlayerMoveLists[APlayer][i].Probability) do
+      begin
+        inc(LIndex);
+        setlength(FProbabilityList,LIndex+1);
+        FProbabilityList[LIndex]:=i;
+      end;
+    end;
 
 
- function SingleMonteCarloWin(APSimBoard:PBoard;var Score:Double):SmallInt;
- var i:integer;ldoneCount,lValCount:Integer;valid:array[1..8]of Boolean;notMovedFor,movC:Int64;lx,ly,x,y:SmallInt;superKoTrouble:Integer;hasmoved:Boolean; movesB,movesW:TMoveList;len,rnd:Integer;StonesOnBoard:SmallInt;
- begin
-  // randomize;
-   notMovedFor:=0;
-   superKoTrouble:=0;
-   movC:=0;
-   GetMoveList(APSimBoard,1,@movesW);
-   GetMoveList(APSimBoard,2,@movesB);
-   while True do
-   begin
-         inc(MovC);
+  end;
 
-         if APSimBoard^.LastMoveCatchedExactlyOne then
-         begin
-           inc(superKoTrouble);
-         end else superKoTrouble:=0;
+  function TMoveGenerator.PopRandomHeuristicItem(const APlayer:SmallInt):TPoint;
+  var
+    LMoveInd:Integer;
+  begin
+    {
+      First, lets compute the heuristic probabilites
+    }
+    ApplyHeuristics(APlayer);
 
-         if (APSimBoard^.Over){or ((MovC>MC_TRUNK))}then
-         begin
-              Score:=CountScore(APSimBoard);
-             if (Score) > 0 then
-               Result:=1 else
-                Result:=2;
-             exit;
-         end;
-        if (superKoTrouble>100) then
-         begin
-            Score:=0;//CountScore(APSimBoard);
-             //if (CountScore(APSimBoard)) > 0 then
-               Result:=random(2)+1;
-             exit;
-         end;
+    {
+      Now we prepare the random choose array
+    }
+      PreparePropabilityList(APlayer);
 
-        //TODO: Reuse the old movelist and just get rid of already made moves,
-        //TODO: So we have a very high chance to guess a valid move from the remaining list
-        //TODO: There are only few possibilities a already valid move gets invalid after another
-        //TODO:     --> maybe check all options for this, and always have valid moves in this list, would be brilliant
-         if APSimBoard^.PlayerOnTurn=1 then
-         begin
-            len:=length(movesW);
-//            GetMoveList(APSimBoard,1,@movesW);
-      if random(MC_MOVE_REFRESH_RATE)=0 then    GetMoveList(APSimBoard,1,@movesW);
-          CleanMoveList(APSimBoard,1,@movesW); //possible only ko-move left
-             len:=length(movesW);
-        //  if len = 0 then GetMoveList(APSimBoard,1,@movesW);
-        //  len:=length(movesW);
-         end else
-          begin
-               len:=length(movesB);
-//                GetMoveList(APSimBoard,2,@movesB);
-        if random(MC_MOVE_REFRESH_RATE)=0 then  GetMoveList(APSimBoard,2,@movesB);
-          CleanMoveList(APSimBoard,2,@movesB) ;
-             len:=length(movesB);
-         //   if len=0 then  GetMoveList(APSimBoard,2,@movesB);
-        //     len:=length(movesB);
-          end;
-//         GetMoveList(APSimBoard,APSimBoard^.PlayerOnTurn,moves);
+    {
+      Now lets choose a random move
+    }
+    if Length(FProbabilityList) > 0 then
+    begin
+      LMoveInd:=FProbabilityList[random(Length(FProbabilityList))];
 
-            if (len=0) then
-           begin
-             ExecuteMove(0,0,APSimBoard^.PlayerOnTurn,APSimBoard,True,True,movesB,MovesW);
-             Continue;
-           end;
-
-           if APSimBoard^.PlayerOnTurn=1 then
-           begin
-                rnd:=random(len);
-                x:=movesW[rnd][1];
-                y:=movesW[rnd][2];
-           end else
-           begin
-               rnd:=random(len);
-                x:=movesB[rnd][1];
-                y:=movesB[rnd][2];
-           end;
-        //  if IsReasonableMove(x,y,APSimBoard,APSimBoard.PlayerOnTurn) then
+      {
+        Now return the coordinates of that move and remove it from the list
+      }
+      Result.X:=FPlayerMoveLists[APlayer][LMoveInd].X;
+      Result.Y:=FPlayerMoveLists[APlayer][LMoveInd].Y;
+      RemoveIndex(LMoveInd,APlayer);
+    end else
+    begin
+      Result.X:=-1;
+      Result.Y:=-1;
+    end;
 
 
+  end;
 
-                    //-------CAPTURE GO APPENDIX---------------
-           { if APSimBoard.RemovedStones[2]>0 then
-            begin
-              Result:=1;
-              Exit;
-            end;
-            if APSimBoard.RemovedStones[1]>0 then
-            begin
-              Result:=2;
-              Exit;
-            end;    }
+  function TMoveGenerator.PopRandomItem(const APlayer:SmallInt):TPoint;
+  var
+    LRandIndex:Integer;
+    len:Integer;
+  begin
+    Result.X:=-1;
+    Result.Y:=-1;
+    len:=FMoveCounts[APlayer];
+    if len > 0 then
+    begin
+      LRandIndex:=random(len);
+      Result.X:=FPlayerMoveLists[APlayer][LRandIndex].X;
+      Result.Y:=FPlayerMoveLists[APlayer][LRandIndex].Y;
+      RemoveIndex(LRandIndex,APlayer);
+    end;
+  end;
 
-          //------------------------------------------
-          //---------ANTI SELF ATARI POLICY-----------------
+  procedure TMoveGenerator.RebuildList(const APlayer:SmallInt);
+  var
+    i,j:Integer;
+    len:Integer;
+  begin
+    FMoveCounts[APlayer]:=0;
+    len:=0;
+    for i := 1 to BOARD_SIZE do
+    begin
+      for j := 1 to BOARD_SIZE do
+      begin
+        {
+          move needs to be valid
+        }
+        if IsValidMove(i,j,APlayer,FAssignedBoard) and
+        {
+          don't kill your eyes as this would
+          lead to endless recapture playouts
+        }
+           (not IsOwnEye(i,j,APlayer,FAssignedBoard)) and
+        {
+          If it does not capture anything, it shouldn't be a self atari.
+          Of course capturing would prevent self atari anyway,
+          but since this is no complete move simulation but just
+          a "forecast", we need this check as a shortcut
+        }
+           (WouldCaptureAnyThing(i,j,FAssignedBoard) or (not IsSelfAtari(i,j,APlayer,FAssignedBoard) ))
+
+        then
+        begin
+
+          FPlayerMoveLists[APlayer][len].X:=i;
+          FPlayerMoveLists[APlayer][len].Y:=j;
+          FPlayerMoveLists[APlayer][len].Probability:=1;
+          inc(FMoveCounts[APlayer]);
+          Inc(len);
+        end;
+      end;
+    end;
+    {
+      passmove is always valid
+    }
+    inc(FMoveCounts[APlayer]);
+    FPlayerMoveLists[APlayer][len].X:=0;
+    FPlayerMoveLists[APlayer][len].Y:=0;
+    FPlayerMoveLists[APlayer][len].Probability:=1;
+  end;
+
+  function PlayoutPosition(const ABoard:PBoard;out Score:Double):SmallInt;
+  var
+    LMoveGen:TMoveGenerator;
+    LMove:TPoint;
+  begin
+    {
+      first we initialize the result with a
+      random player to win to decide what happens in a tie situation
+    }
+    if random(2)=0 then
+      Result:=1
+    else
+      Result:=2;
+    {
+      now we setup the movelists, and populate them
+      with all possible moves for both players
+    }
+    LMoveGen:=TMoveGenerator.Create;
+    try
+      LMoveGen.AssignedBoard:=ABoard;
+      LMoveGen.RebuildList(1);
+      LMoveGen.RebuildList(2);
+
+      {
+        now we loop until the game is over, doing one random
+        possible move after the other
+      }
+     while True do
+      begin
+      {
+        we refresh our possible moves every iteration
+        because the cost of accidentally trying an invalid move is higher
+        in average than just refreshing.
+
+        Also by always refreshing our playout is not as biased as without
+        the refresh
+       }
+      LMoveGen.RebuildList(ABoard.PlayerOnTurn);
 
 
-           if IsSelfAtari(x,y,ApSimBoard.PlayerOnTurn,APsimBoard) and (Random(2)=0) then
-            Continue;//random accept self atari (if not -> can't kill enemy shapes and possible playout lock)
-          //-------------ANTI SELF ATARI POLICY END---------------------
-
-          //-----------CATCH STONE IF YOU CAN POLICY-------------------------
-
-
-//          if random((WouldCaptureAnyThing(x,y,APSimBoard)*5)+1)=0  then
-          begin
-
-
-         { if IsSelfAtari(ApSimBoard.LastMoveCoordX,APsimBoard.LastMoveCoordY,ReverseColor(ApSimBoard.PlayerOnTurn),APSimBoard) then   //try to capture playout policy
-          begin
-            if WouldCaptureLastMove(ApSimBoard.LastMoveCoordX-1,ApSimBoard.LastMoveCoordY,APSimBoard) then
-            begin
-              X:=ApSimBoard.LastMoveCoordX-1;
-              Y:=ApSimBoard.LastMoveCoordY;
-            end;
-            if WouldCaptureLastMove(ApSimBoard.LastMoveCoordX+1,ApSimBoard.LastMoveCoordY,APSimBoard) then
-            begin
-              X:=ApSimBoard.LastMoveCoordX+1;
-              Y:=ApSimBoard.LastMoveCoordY;
-            end;
-                        if WouldCaptureLastMove(ApSimBoard.LastMoveCoordX,ApSimBoard.LastMoveCoordY-1,APSimBoard) then
-            begin
-              X:=ApSimBoard.LastMoveCoordX;
-              Y:=ApSimBoard.LastMoveCoordY-1;
-            end;
-                        if WouldCaptureLastMove(ApSimBoard.LastMoveCoordX,ApSimBoard.LastMoveCoordY+1,APSimBoard) then
-            begin
-              X:=ApSimBoard.LastMoveCoordX;
-              Y:=ApSimBoard.LastMoveCoordY+1;
-            end;
-          end; }
-          //-----------CATCH STONE IF YOU CAN POLICY END-------------------------
-          //--------------LOCAL MOVE POLICY----------------
-//          if random(3)=0 then //prefer local answer
-//          begin
-//            lValCount:=0;
-//            for i := 1 to 8 do
-//            begin
-//              lx:=APSimBoard.LastMoveCoordX+Directions[i,1];
-//              ly:=APSimBoard.LastMoveCoordY+Directions[i,2];
-//              valid[i]:=false;
-//              if IsValidMove(lx,ly,ApSimBoard.PlayerOnTurn,ApSimBoard) then
-//              begin
-//                inc(lValCount);
-//                valid[i]:=True;
-//              end;
-//            end;
-//            ldoneCount:=0;
-//            for i := 1 to 8 do
-//            begin
-//                if valid[i] then
-//                begin
-//                  if random(lValCount-ldoneCount)=0 then
-//                  begin
-//                    x:=lx;
-//                    y:=ly;
-//                    break;
-//                  end else inc(ldoneCount);
-//                end;
-//
-//
-//            end;
-//
-//          end;
-          end;
-          //--------LOCAL MOVE POLICY END----------------------
-          if random(2+WouldCaptureAnyThing(x,y,APSimBoard))>0 then
-            ExecuteMove (x,y,APSimBoard^.PlayerOnTurn,APSimBoard,False,False,movesB,MovesW); //else
+        if ABoard.Over then
+        begin
+          Score:= CountScore(ABoard);
+          if Score>0 then
+            Exit(1)
+          else
+            Exit(2);
+        end;
+        LMove:=LMoveGen.PopRandomHeuristicItem(ABoard.PlayerOnTurn);
 
 
-                  //  begin
-        //     ExecuteMove(0,0,APSimBoard^.PlayerOnTurn,APSimBoard,True,True,movesB,MovesW);
-       //   end;
+        if not ExecuteMove(LMove.X,LMove.Y,ABoard.PlayerOnTurn,ABoard,False,False) then
+        begin
+          {
+            if our movelist is screwed up because we didn't refresh
+            we do so and retry making a move
+          }
+        // LMoveGen.RebuildList(ABoard.PlayerOnTurn);
+          Continue
 
-   end;
- end;
+        end;
+      end;
+    finally
+      LMoveGen.Free;
+    end;
+  end;
+
+
+{ TRunAwayHeuristic }
+
+class function TRunAwayHeuristic.GetHeuristicFactor(const ABoard: PBoard;
+  const AX, AY, AColor: SmallInt): Double;
+  function IsOwnGroupInAtari(X,Y:SmallInt):Boolean;
+  begin
+    if ABoard.Occupation[X,Y] <> AColor then
+      Exit(False);
+    Result:= CountLiberties(X,Y,ABoard,True) = 1;
+  end;
+var
+  LWasInAtari:Boolean;
+begin
+{
+  first we check, if any neighbour group is in atari right now
+}
+  LWasInAtari:= IsOwnGroupInAtari(AX+1,AY) OR
+                IsOwnGroupInAtari(AX-1,AY) OR
+                IsOwnGroupInAtari(AX,AY+1) OR
+                IsOwnGroupInAtari(AX,AY-1);
+
+  if not LWasInAtari then
+  begin
+    Result:=1;
+  end else
+  begin
+    {
+      if one of the own neighbour groups is in atari
+      we simulate a move on our field, and then check this field for liberties
+      if it somehow connects or runs out, our liberties should be >1
+
+      For simulation we can safely assume that this field must be empty!
+    }
+
+    ABoard.Occupation[AX,AY]:=AColor;
+    if CountLiberties(AX,AY,ABoard,True)>1 then
+    begin
+      {
+        if our move frees from the atari, our value depends on the groupsize we
+        saved with this move
+      }
+      Result:=RecMarkGroupSize(AX,AY,ABoard,True);
+    end else
+    begin
+      {
+        if we have a move that just keeps the group in atari,
+        it is mostly useless (not for KO though, need to think about it)
+      }
+      Result:=0.5;
+    end;
+
+    {
+      don't forget to reset our simulated stone ;)
+    }
+    ABoard.Occupation[AX,AY]:=0;
+  end;
+
+
+end;
+
 end.

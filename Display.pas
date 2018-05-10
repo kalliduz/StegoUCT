@@ -1,7 +1,7 @@
 unit Display;
 
 interface
-uses Classes,Windows, Graphics, DataTypes,ExtCtrls,SysUtils;
+uses Classes,Windows, VCL.Graphics, DataTypes,VCL.ExtCtrls,SysUtils;
 procedure PaintEmptyBoard(ADrawImage:TImage;ABoardSize:Integer);
 function CalcStoneSize(ADrawImage:TImage;ABoardSize:Integer):Double;inline;
 procedure PaintOccupation(ADrawImage:TImage;ABoardSize:Integer;ABoard:PBoard);

@@ -4,40 +4,87 @@ interface
   uses
     VCL.Graphics,Classes;
   const
-    BOARD_SIZE=5;
-    SIMULATIONS=3000;
-    UCT_BESTMOVE = 1;
-//    ALPHA_AMAF_FACTOR = 0.1;
 
- // amaf value for a node decreases linear until this node was played out X times
-    ALPHA_AMAF_MINMOVES = 2000;
+//////////////////////////////////
+///
+///      GENERAL CONSTANTS
+///
+/////////////////////////////////
 
-    UCT_NORMALMOVE = (BOARD_SIZE*BOARD_SIZE);
-   // MC_TRUNK=BOARD_SIZE*BOARD_SIZE*1000000;
-    DYN_KOMI=6.5;
-    MC_MOVE_REFRESH_RATE=BOARD_SIZE;
-    MC_MAX_THREADS=5;
+    BOARD_SIZE=9;
+
+    KOMI=6.5;
+
+    //turn on for chinese rules
     ALLOW_SUICIDE = FALSE;
-    EXPLORATION_FACTOR_START=0.5; //should be sqrt(2), bigger values -> broader tree
-    EXPLORATION_FACTOR_END=0.2;
-    EXPLORATION_FACTOR_STEP=0.0;
 
-    AMAF_WIN_REDUCTION_FACTOR=1.41;
+    //if the adaptive winrate for computerplayer is lower, it will resign
     RESIGN_TRESHOLD = 0.15;
-    MAX_AMAF_MOVES = BOARD_SIZE*BOARD_SIZE;
-    CAPTURE_EXPLORE_FACTOR=1;
-    NEIGHBOUR_HEURISTIC_FACTOR=1;
-    HISTOGRAMM_RANGE=BOARD_SIZE*BOARD_SIZE -1 ;
-    BOARDER_HEURISTIC_FACTOR =1;
-    TENUKI_PREVENT_HEURISTIC_FACTOR=1;
 
     MAX_MEMORY = 1473741824; //2GB
 
-    MAX_PRUNE_TREE_PRESERVE=10; //minimum variations preservered in every node of the tree
-    MIN_DEPTH_FORCED_PRUNE=5; //specifies the minimum depth at which the tree is forcefully cut if
-                              //memory limits are exceeding
+/////////////////////////////////
+///
+///       MCTS CONSTANTS
+///
+/////////////////////////////////
 
-    MAX_INPUT_BUFFER_SIZE=1024;
+    //what is the maximum node depth of the playout tree
+    MAX_TREE_DEPTH = 1024;
+
+    //how many threads should be assigned to montecarlo playouts
+    MC_MAX_THREADS=7;
+
+    //how often do we want to rebuild a movelist? usually you want to have 1 here
+    MC_MOVE_REFRESH_RATE=BOARD_SIZE;
+
+
+    {
+      minimum playouts for a node to be able to spawn subnodes
+      higher value:
+        - less memory consumption by nodes
+        - less tree search overhead
+        - better ply/sec
+
+      lower value:
+        - better exploitation of the tree
+    }
+    MC_MIN_NODE_PLAYOUT = 100;
+
+    {
+      this constant defines the number of MC playouts done at once
+      higher value:
+        - less threading overhead
+        - better ply/sec
+      lower value:
+        - more nodes visited in given time
+        - better chance of recognizing good moves
+    }
+    MC_PLAYOUT_CHUNK_SIZE = 10;
+
+////////////////////////////////
+///
+///  UCT/AMAF/RAVE CONSTANTS
+///
+////////////////////////////////
+
+    //theoretically sqrt(2), bigger values -> broader tree
+    EXPLORATION_FACTOR=0.3;
+
+     // amaf value for a node decreases linear until this node was played out X times
+    ALPHA_AMAF_MINMOVES = 10000;
+
+
+
+
+
+
+
+
+    HISTOGRAMM_RANGE=BOARD_SIZE*BOARD_SIZE -1 ;
+
+
+
 type
 
   TBoard = record
@@ -80,7 +127,7 @@ type
     X,Y:SmallInt;
   end;
   TAMAFList = record
-    Moves: array [1..MAX_AMAF_MOVES] of TMove;
+//    Moves: array [1..MAX_AMAF_MOVES] of TMove;
     MoveCount:SmallInt;
   end;
   PRatingTable = ^TRatingTable;
@@ -105,7 +152,11 @@ type
     NumberNeighboursOwnColor:Byte;
     SelfOwnColor:Boolean;
   end;
-
+  TOccupation = record
+    X,Y:Integer;
+    Color:SmallInt;
+  end;
+  TOccupationList = array of TOccupation;
 
 implementation
 

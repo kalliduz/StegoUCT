@@ -8,54 +8,88 @@ interface
 uses DataTypes,Types;
 
     //------NOT DEPENDING ON VALID MOVES------------------------
-    function RecMarkGroupSize(ARecX,ARecY:SmallInt;APBoard:PBoard;FirstCall:Boolean):SmallInt;
-    function IsValidMove(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
+    function RecMarkGroupSize(const ARecX,ARecY:SmallInt;const APBoard:PBoard;const FirstCall:Boolean):SmallInt;
+    function IsValidMove(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
     function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
     function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt; const AStopAfterTwo:Boolean):SmallInt;
     function CountLibertiesRec_(const AX,AY:SmallInt;const APBoard:PBoard;const AFirstCall:Boolean;const MarkedFields:PMarkList;var ALen:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
     function CountLibertiesIterative_(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
    // function HasLiberties(AX,AY:SmallInt;APBoard:PBoard;AFirstCall:Boolean):Boolean; //much faster than test CountLiberties = 0
-    function IsEqualField(const AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;inline;
-    function ExecuteMove(AX,AY,AColor:SmallInt;APBoard:PBoard;ANullMove:Boolean;AFastMode:Boolean;var MovesB,MovesW:TMoveList):Boolean; //fastmode requires valid move check
-    function RemoveGroupRec(AX,AY:SmallInt;APBoard:PBoard;var MovesB,MovesW:TMoveList):SmallInt;
-    procedure ResetBoard(APBoard:PBoard);
-    function HasMovesLeft(AColor:SmallInt;APBoard:PBoard):Boolean;
-    function IsOwnEye(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
-    function WhiteSpaceBelongsTo(AX,AY:SmallInt;APBoard:PBoard):SmallInt;
-    function GetOccupationAt(AX,AY:SmallInt;APBoard:PBoard):SmallInt; //-1 if oob;
-    function HasReasonableMoves(APBoard:PBoard;AColor:SmallInt):Boolean;
-    function IsReasonableMove(AX,AY:SmallInt;APBoard:PBoard;AColor:SmallInt):Boolean;
-    procedure GetMoveList(APBoard:PBoard;AColor:SmallInt; MoveList:PMoveList);
-    function HasNeighbour(AX,AY:SmallInt;ApBoard:PBoard):Boolean;
-    procedure CleanMoveList(APBoard:PBoard;AColor:SmallInt; MoveList:PMoveList);
-    procedure ResetRatingTable(APRatingTable:PRatingTable;APBoard:PBoard);
-    function IsSelfAtari(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
-    function WouldCaptureLastMove(AX,AY:SmallInt;APBoard:PBoard):Boolean;
-    function WouldCaptureAnyThing(AX,AY:SmallInt;APboard:PBoard):SmallInt;
+    function IsEqualField(const AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;
+    function ExecuteMove(const AX,AY,AColor:SmallInt;const APBoard:PBoard;const ANullMove:Boolean;const AFastMode:Boolean):Boolean; //fastmode requires valid move check
+    function RemoveGroupRec(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
+    procedure ResetBoard(const APBoard:PBoard);
+    function HasMovesLeft(const AColor:SmallInt;const APBoard:PBoard):Boolean;
+    function IsOwnEye(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
+    function WhiteSpaceBelongsTo(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
+    function GetOccupationAt(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt; //-1 if oob;
+    function HasReasonableMoves(const APBoard:PBoard;const AColor:SmallInt):Boolean;
+    function IsReasonableMove(const AX,AY:SmallInt;const APBoard:PBoard;const AColor:SmallInt):Boolean;
+    procedure GetMoveList(const APBoard:PBoard;const AColor:SmallInt; const MoveList:PMoveList);
+    function HasNeighbour(const AX,AY:SmallInt;const ApBoard:PBoard):Boolean;
+    procedure CleanMoveList(const APBoard:PBoard;const AColor:SmallInt;const  MoveList:PMoveList);
+    procedure ResetRatingTable(const APRatingTable:PRatingTable;const APBoard:PBoard);
+    function IsSelfAtari(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
+    function WouldCaptureLastMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+    function WouldCaptureAnyThing_(const AX,AY:SmallInt;const APboard:PBoard):SmallInt;
+    function WouldCaptureAnyThing(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
   //-----------------------------------------------------------
 
-  function GetBoardHash(APBoard:PBoard):Int64;
-  function CountScore(APBoard:PBoard):Double;
+  function GetBoardHash(const APBoard:PBoard):Int64;
+  function CountScore(const APBoard:PBoard):Double;
 
   //-----VALID MOVES NEEDED----------------
 
-  function IsKoValidMove(AX,AY:SmallInt;APBoard:PBoard):Boolean;
-  function IsSuicide(AX,AY:SmallInt;AColor:SmallInt; APBoard:PBoard):Boolean;
+  function IsKoValidMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+  function IsSuicide(const AX,AY:SmallInt;const AColor:SmallInt;const  APBoard:PBoard):Boolean;
   //--------------------------------------------
-    function ReverseColor(AColor:SmallInt):SmallInt;inline;
+    function ReverseColor(const AColor:SmallInt):SmallInt;
 
-
+threadvar
+  LRecursionCounter:Integer;
+  TopMark,LeftMark,BotMark,RightMark:Integer;
 
 implementation
 
 
 uses Math,System.Generics.Collections,Winapi.Windows;
-threadvar
-  LRecursionCounter:Integer;
 
-function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
-procedure MarkAndCall(const X,Y:SmallInt);
+
+
+function WouldCaptureAnyThing(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+var LCol:SmallInt;
+function IsInAtari(X,Y:SmallInt):Boolean;
 begin
+  Result:=False;
+  if APBoard.Occupation[X,Y] <> LCol then
+    Exit;
+  Result:= CountLiberties(X,Y,APBoard,True)=1;
+end;
+begin
+{
+  the functionality is simple:
+  look for opponent neighbour stones
+  count the liberties of the group of these stones
+  return TRUE, if one of these liberties is 1,
+  because placing the stone would reduce it to 0
+}
+  LCol:=ReverseColor(APBoard.PlayerOnTurn);
+  Result:=False;
+  if IsInAtari(AX,AY-1) then
+    Exit(True);
+  if IsInAtari(AX,AY+1) then
+    Exit(True);
+  if IsInAtari(AX-1,AY) then
+    Exit(True);
+  if IsInAtari(AX+1,AY) then
+    Exit(True);
+
+end;
+
+function MarkAndCall(const X,Y:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt;const AStopAfterTwo:Boolean):Integer;
+begin
+
+  Result:=0;
   if AStopAfterTwo and (LRecursionCounter>= 2) then
     Exit;
   if APBoard.Occupation[X,Y] = AMatchColor then
@@ -68,7 +102,15 @@ begin
   begin
     if APBoard.Occupation[X,Y] = 0 then
     begin
-      APBoard.Occupation[X,Y] := 254; //the actual marking doesnt matter here
+      if X>RightMark then
+        RightMark:=X;
+      if X<LeftMark then
+        LeftMark:=X;
+      if Y>BotMark then
+        BotMark:=Y;
+      if Y<TopMark then
+        TopMark:=Y;
+      APBoard.Occupation[X,Y] := 254; //so now 0 fields are 254
       Inc(Result);
       Inc(LRecursionCounter);
       {
@@ -77,23 +119,40 @@ begin
     end;
   end;
 end;
+
+function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
+
 begin
   Result:=0;
+  if APBoard.Occupation[AX,AY]=0 then
+    Exit;
   if ((AStopAfterTwo) AND (LRecursionCounter >= 2)) then
     Exit;
   //we can assume this is a valid stone, because otherwise this proc
   //wouldn't have been called
-  APBoard.Occupation[AX,AY]:=255; //so lets mark it as a group stone before we call the recursion
-  MarkAndCall(AX-1,AY);
-  MarkAndCall(AX+1,AY);
-  MarkAndCall(AX,AY-1);
-  MarkAndCall(AX,AY+1);
-
-
+  {
+    we mark with different value here, so we can turn them back
+  }
+  if AX>RightMark then
+    RightMark:=AX;
+  if AX<LeftMark then
+    LeftMark:=AX;
+  if AY>BotMark then
+    BotMark:=AY;
+  if AY<TopMark then
+    TopMark:=AY;
+  if AMatchColor = 1  then
+  APBoard.Occupation[AX,AY]:=3 else
+  APBoard.Occupation[AX,AY]:=4;   //so lets mark it as a group stone before we call the recursion
+  Result:= Result + MarkAndCall(AX-1,AY,APBoard,AMatchColor,AStopAfterTwo);
+  Result:= Result + MarkAndCall(AX+1,AY,APBoard,AMatchColor,AStopAfterTwo);
+  Result:= Result + MarkAndCall(AX,AY-1,APBoard,AMatchColor,AStopAfterTwo);
+  Result:= Result + MarkAndCall(AX,AY+1,APBoard,AMatchColor,AStopAfterTwo);
 end;
+
 function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
 var
-  LBoard:PBoard;
+  i,j:Integer;
 begin
     if AStopAfterTwo then
       LRecursionCounter:=0;
@@ -103,10 +162,47 @@ begin
     if AY=0 then exit;
     if AX>BOARD_SIZE then exit;
     if AY>BOARD_SIZE then exit;
-    New(LBoard);
-    CopyMemory(LBoard,APBoard,sizeof(APBoard^));
-    Result:= CountLibertiesRecursive(AX,AY,LBoard,LBoard.Occupation[AX,AY],AStopAfterTwo);
-    Dispose(LBoard);
+
+
+    {
+      for faster cleanup, we remember how big the rectangle around
+      the counted group was, so we don't need to cleanup everything
+    }
+    TopMark:=BOARD_SIZE;
+    LeftMark:=BOARD_SIZE;
+    RightMark:=1;
+    BotMark:=1;
+
+    try
+
+      Result:= CountLibertiesRecursive(AX,AY,APBoard,APBoard.Occupation[AX,AY],AStopAfterTwo);
+    finally
+      {
+        cleanup the marks
+      }
+      for i := LeftMark to RightMark do
+      begin
+        for j := TopMark to BotMark do
+        begin
+          if APBoard.Occupation[i,j] = 254 then
+          begin
+            APBoard.Occupation[i,j]:=0;
+            Continue;
+          end;
+          if APBoard.Occupation[i,j] = 3 then
+          begin
+            APBoard.Occupation[i,j]:=1;
+            Continue;
+          end;
+          if APBoard.Occupation[i,j] = 4 then
+          begin
+            APBoard.Occupation[i,j]:=2;
+            Continue;
+          end;
+        end;
+      end;
+    end;
+
 end;
 
   function CountLibertiesIterative_(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
@@ -208,86 +304,103 @@ end;
     Dispose(LBoard);
   end;
 
-  function WouldCaptureAnyThing(AX,AY:SmallInt;APboard:PBoard):SmallInt;
-  var lBoard:TBoard;lMarkList:TMarkList;lLen:SmallInt;X,Y:SmallInt;
+  function WouldCaptureAnyThing_(const AX,AY:SmallInt;const APboard:PBoard):SmallInt;
+  var
+    lBoard:PBoard;
+    lLen:SmallInt;
+    X,Y:SmallInt;
   begin
 
     Result:=0;
    // if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then Exit;
+    new(LBoard);
+    try
+      MoveMemory(LBoard,apBoard,Sizeof(TBoard));
 
-    lBoard:=ApBoard^;
-    lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
-     X:=AX-1;
-     Y:=AY;
-   // if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
-    if CountLiberties(X,Y,@LBoard,True) = 0 then
-    begin
-      Result:=RecmarkgroupSize(x,y,apboard,true);
+       lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
+       X:=AX-1;
+       Y:=AY;
+     // if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+      if CountLiberties(X,Y,@LBoard,True) = 0 then
+      begin
+        Result:=RecmarkgroupSize(x,y,apboard,true);
 
-    end;
-         X:=AX+1;
-     Y:=AY;
-//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
-    if CountLiberties(X,Y,@LBoard,True) = 0 then
-    begin
-      Result:=Result+RecmarkgroupSize(x,y,apboard,true);
+      end;
+           X:=AX+1;
+       Y:=AY;
+  //    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+      if CountLiberties(X,Y,@LBoard,True) = 0 then
+      begin
+        Result:=Result+RecmarkgroupSize(x,y,apboard,true);
 
+      end;
+            X:=AX;
+       Y:=AY-1;
+  //    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+      if CountLiberties(X,Y,@LBoard,True) = 0 then
+      begin
+        Result:=Result+RecmarkgroupSize(x,y,apboard,true);
+        Exit;
+      end;
+           X:=AX;
+       Y:=AY+1;
+  //    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
+      if CountLiberties(X,Y,@LBoard,True) = 0 then
+      begin
+        Result:=Result+RecmarkgroupSize(x,y,apboard,true);
+        Exit;
+      end;
+    finally
+      Dispose(LBoard);
     end;
-          X:=AX;
-     Y:=AY-1;
-//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
-    if CountLiberties(X,Y,@LBoard,True) = 0 then
-    begin
-      Result:=Result+RecmarkgroupSize(x,y,apboard,true);
-      Exit;
-    end;
-         X:=AX;
-     Y:=AY+1;
-//    if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
-    if CountLiberties(X,Y,@LBoard,True) = 0 then
-    begin
-      Result:=Result+RecmarkgroupSize(x,y,apboard,true);
-      Exit;
-    end;
+
   end;
-   function WouldCaptureLastMove(AX,AY:SmallInt;APBoard:PBoard):Boolean;
-   var lBoard:TBoard;lMarkList:TMarkList;lLen:SmallInt;
+   function WouldCaptureLastMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+   var lMarkList:TMarkList;lLen:SmallInt; LOccup:SmallInt;
    begin
+    if (APBoard.LastMoveCoordX = 0) AND ( APboard.LastMoveCoordY = 0) then
+      Exit(False);
+
     Result:=False;
-    //commented this section out
-    //at this path, a move provided has to be always correct!
-    //if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then
-    //begin
-    // Exit;
-    //end;
 
-    lBoard:=ApBoard^;
-    lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
-//    if CountLibertiesRec(LBoard.LastMoveCoordX,LBoard.LastMoveCoordY,@lBoard,True,@lMarkList,lLen,True)= 0 then
-    if CountLiberties(lBoard.LastMoveCoordX,lBoard.LastMoveCoordY,@lBoard,True)=0 then
-    begin
-      Result:=True;
-    end;
-
-
-   end;
-    function IsSelfAtari(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
-    var SimBoard:TBoard; lMarkList:TMarkList; lLen:SmallInt;
-    begin
-      Result:=False;
-      SimBoard:=APBoard^; //copy to not interfere threads working on pointed board
-      if WouldCaptureLastMove(AX,AY,APBoard) then Exit; //no self atari if capture....
-
-      if SimBoard.Occupation[AX,AY]=0 then SimBoard.Occupation[AX,AY]:=AColor;
-//      if CountLibertiesRec(AX,AY,@SimBoard,True,@lMarkList,lLen,True)< 2 then
-      if CountLiberties(AX,AY,@SimBoard,True)<2 then
+      LOccup:=APBoard.Occupation[AX,AY];
+      APBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
+      if CountLiberties(APBoard.LastMoveCoordX,APBoard.LastMoveCoordY,APBoard,True)=0 then
       begin
         Result:=True;
       end;
+      APBoard.Occupation[AX,AY]:=LOccup;
+
+
+   end;
+
+    function IsSelfAtari(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
+    var lLen:SmallInt;LWasEmpty:Boolean;
+    begin
+      Result:=False;
+      try
+        if WouldCaptureLastMove(AX,AY,APBoard) then Exit; //no self atari if capture....
+
+        if APBoard.Occupation[AX,AY]=0 then
+        begin
+         APBoard.Occupation[AX,AY]:=AColor;
+         LWasEmpty:=True;
+        end;
+        if CountLiberties(AX,AY,APBoard,True)<2 then
+        begin
+          Result:=True;
+
+        end;
+        if LWasEmpty then
+          APBoard.Occupation[AX,AY]:=0;
+      finally
+      end;
+
 
 
     end;
-    procedure ResetRatingTable(APRatingTable:PRatingTable;APBoard:PBoard);
+
+    procedure ResetRatingTable(const APRatingTable:PRatingTable;const APBoard:PBoard);
     var i,j:INteger;
     begin
       for i := 1 to BOARD_SIZE do
@@ -306,7 +419,7 @@ end;
       APRatingTable.RatingPass.WinsBlack:=0;
     end;
 
-    procedure CleanMoveList(APBoard:PBoard;AColor:SmallInt; MoveList:PMoveList);
+    procedure CleanMoveList(const APBoard:PBoard;const AColor:SmallInt; const MoveList:PMoveList);
     var i:Integer;len:Integer;
     begin
       i:=0;
@@ -404,7 +517,7 @@ end;
     //----------------------------------
 
     end;
- function HasNeighbour(AX,AY:SmallInt;ApBoard:PBoard):Boolean;
+ function HasNeighbour(const AX,AY:SmallInt;const ApBoard:PBoard):Boolean;
  begin
     Result := True;
 //    if IsEqualField(Ax-1,AY,1,APBoard) then exit;
@@ -426,7 +539,7 @@ end;
 //    if IsEqualField(Ax,AY+1,2,APBoard) then exit;
     Result:=False;
  end;
-procedure GetMoveList(APBoard:PBoard;AColor:SmallInt; MoveList:PMoveList);
+procedure GetMoveList(const APBoard:PBoard;const AColor:SmallInt;const  MoveList:PMoveList);
 var i,j:Integer; len:integer; mark:Boolean;
 begin
 
@@ -447,7 +560,7 @@ begin
       end;
     end;
 end;
- function IsReasonableMove(AX,AY:SmallInt;APBoard:PBoard;AColor:SmallInt):Boolean;
+ function IsReasonableMove(const AX,AY:SmallInt;const APBoard:PBoard;const AColor:SmallInt):Boolean;
  begin
 
  if IsValidMove(AX,AY,AColor,APBoard) then
@@ -466,7 +579,7 @@ end;
     //Result:= Result AND (HasNeighbour(Ax,AY,APBoard) or (random(100)=0));
    end else Result:=False;
  end;
-  function HasReasonableMoves(APBoard:PBoard;AColor:SmallInt):Boolean;
+  function HasReasonableMoves(const APBoard:PBoard;const AColor:SmallInt):Boolean;
   var i,j:Integer;
   begin
     Result:=True;
@@ -474,7 +587,7 @@ end;
     Result:=False;
   end;
 
-   function GetOccupationAt(AX,AY:SmallInt;APBoard:PBoard):SmallInt;
+   function GetOccupationAt(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
    begin
      Result:=-1;
     if AX=0 then exit;
@@ -483,7 +596,7 @@ end;
     if AY>BOARD_SIZE then exit;
     Result:=APBoard^.Occupation[AX,Ay];
    end;
-   function WhiteSpaceBelongsTo(AX,AY:SmallInt;APBoard:PBoard):SmallInt;
+   function WhiteSpaceBelongsTo(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
    var GotColor:Boolean;n,w,s,e:SmallInt;black,white:integer;
    begin
      Result := 0;
@@ -509,38 +622,45 @@ end;
      if white>0 then if black =0 then Result:=1;
 
    end;
-   function IsOwnEye(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
+   function IsOwnEye(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
+   var
+    LCol:SmallInt;
    begin
      Result:=False;
+     LCol:=ReverseColor(AColor);
      if IsEqualField(AX-1,AY,0,APBoard) then Exit;
-     if IsEqualField(AX-1,AY,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX-1,AY,LCol,APBoard) then Exit;
      if IsEqualField(AX+1,AY,0,APBoard) then Exit;
-     if IsEqualField(AX+1,AY,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX+1,AY,LCol,APBoard) then Exit;
 
      if IsEqualField(AX,AY-1,0,APBoard) then Exit;
-     if IsEqualField(AX,AY-1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX,AY-1,LCol,APBoard) then Exit;
      if IsEqualField(AX,AY+1,0,APBoard) then Exit;
-     if IsEqualField(AX,AY+1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX,AY+1,LCol,APBoard) then Exit;
 
 
      if IsEqualField(AX-1,AY-1,0,APBoard) then Exit;
-     if IsEqualField(AX-1,AY-1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX-1,AY-1,LCol,APBoard) then Exit;
      if IsEqualField(AX+1,AY+1,0,APBoard) then Exit;
-     if IsEqualField(AX+1,AY+1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX+1,AY+1,LCol,APBoard) then Exit;
 
      if IsEqualField(AX+1,AY-1,0,APBoard) then Exit;
-     if IsEqualField(AX+1,AY-1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX+1,AY-1,LCol,APBoard) then Exit;
      if IsEqualField(AX-1,AY+1,0,APBoard) then Exit;
-     if IsEqualField(AX-1,AY+1,ReverseColor(AColor),APBoard) then Exit;
+     if IsEqualField(AX-1,AY+1,LCol,APBoard) then Exit;
 
-     if not IsSuicide(AX,AY,ReverseColor(AColor),APBoard) then Exit; // threatened "false" eye can be filled
+     {
+       when placing a enemy stone inside the "eye" would capture it,
+       this shape has obviously only one eye, so its now real eye
+     }
+    // if not IsSuicide(AX,AY,LCol,APBoard) then Exit;
 
      Result :=True;
    end;
-   function CountScore(APBoard:PBoard):Double;
+   function CountScore(const APBoard:PBoard):Double;
    var i,j:integer;occ:SmallInt;Stones:Integer;
    begin
-     Result:=DYN_KOMI;
+     Result:=KOMI;
     // Stones:=APBoard^.MoveNr div 2;
    //  Result:=Result// -(Stones+1)  //black stones in the game  (one more than whites..)
 //              +(APBoard^.RemovedStones[2]) // captured black stones removed from black points, added to white points
@@ -561,7 +681,7 @@ end;
 
     // Result:=Result+APBoard^.RemovedStones[2]*2-APBoard^.RemovedStones[1]*2;
    end;
-   function HasMovesLeft(AColor:SmallInt;APBoard:PBoard):Boolean;
+   function HasMovesLeft(const AColor:SmallInt;const APBoard:PBoard):Boolean;
    var i,j:Integer;
    begin
      Result := False;
@@ -577,7 +697,7 @@ end;
         end;
     end;
    end;
-   procedure ResetBoard(APBoard:PBoard);
+   procedure ResetBoard(const APBoard:PBoard);
    var i,j:Integer;
    begin
     APBoard^.MoveNr:=0;
@@ -595,19 +715,32 @@ end;
     APBoard^.Over:=False;
     APBoard^.RemovedStones[1]:=0;
     APBoard^.RemovedStones[2]:=0;
-    APBoard.LastMoveCoordX:=BOARD_SIZE div 2+1;
-    APBoard.LastMoveCoordY:=BOARD_SIZE div 2+1;
+    APBoard.LastMoveCoordX:=0;
+    APBoard.LastMoveCoordY:=0;
    end;
-  function ExecuteMove(AX,AY,AColor:SmallInt;APBoard:PBoard;ANullMove:Boolean;AFastMode:Boolean;var MovesB,MovesW:TMoveList):Boolean;
+  function ExecuteMove(const AX,AY,AColor:SmallInt;const APBoard:PBoard;const ANullMove:Boolean;const AFastMode:Boolean):Boolean;
   var enemyColor:SmallInt;RemCount:SmallInt;
   begin
-    if ANullMove then
+    if AX < 0 then
+      Exit(False);
+    if AY < 0 then
+      Exit(False);
+    if AX > BOARD_SIZE then
+      Exit(False);
+    if AY > BOARD_SIZE then
+      Exit(False);
+    if ((AX = 0)and (AY <> 0))then
+      Exit(False);
+    if ((AY = 0)and (AX <> 0))then
+      Exit(False);
+    if ANullMove or ((AX = 0) AND (AY=0)) then
     begin
       APBoard.LastMoveCatchedExactlyOne:=False;
       if APBoard^.LastPlayerPassed then
       begin
         APBoard^.Over:=True;
         APBoard.LastMoveCatchedExactlyOne:=False;
+        if APBoard^.PlayerOnTurn=1 then APBoard^.PlayerOnTurn:=2 else APBoard^.PlayerOnTurn:=1;
         Result := True;
         Exit;
       end;
@@ -618,7 +751,13 @@ end;
     end;
     Result := false;
     if not AFastMode then //skip validation in FastMode
-        if not IsValidMove(AX,AY,AColor,APBoard) then exit;
+    begin
+        if not IsValidMove(AX,AY,AColor,APBoard) then
+        begin
+          Result:=False;
+         exit;
+        end;
+    end;
 
     APBoard^.Occupation[AX,AY]:=AColor;
     //---------NOW REMOVE CAPTURED ENEMY GROUPS-------
@@ -629,7 +768,7 @@ end;
         if CountLiberties(AX,AY,APBoard,True) = 0 then
        // If not HasLiberties(AX,AY,APBoard,True) then
         begin
-          RemCount:= RemoveGroupRec(AX,AY,APBoard,MovesB,MovesW);
+          RemCount:= RemoveGroupRec(AX,AY,APBoard);
            APBoard^.RemovedStones[AColor]:=APBoard^.RemovedStones[AColor]+RemCount;  //keep track of captured stones
 
         end;
@@ -640,7 +779,7 @@ end;
         if CountLiberties(AX-1,AY,APBoard,True) = 0 then
 //        If not HasLiberties(AX-1,AY,APBoard,True) then
         begin
-         RemCount:=RemCount+ RemoveGroupRec(AX-1,AY,APBoard,MovesB,MovesW);
+         RemCount:=RemCount+ RemoveGroupRec(AX-1,AY,APBoard);
            APBoard^.LastCatchX:=AX-1;
            APBoard^.LastCatchY:=AY;
         end;
@@ -650,7 +789,7 @@ end;
         if CountLiberties(AX+1,AY,APBoard,True) = 0 then
 //        If not HasLiberties(AX+1,AY,APBoard,True) then
         begin
-         RemCount:= RemCount+RemoveGroupRec(AX+1,AY,APBoard,MovesB,MovesW);
+         RemCount:= RemCount+RemoveGroupRec(AX+1,AY,APBoard);
             APBoard^.LastCatchX:=AX+1;
            APBoard^.LastCatchY:=AY;
 
@@ -661,7 +800,7 @@ end;
         if CountLiberties(AX,AY-1,APBoard,True) = 0 then
 //        If not HasLiberties(AX,AY-1,APBoard,True) then
         begin
-         RemCount:=RemCount+ RemoveGroupRec(AX,AY-1,APBoard,MovesB,MovesW);
+         RemCount:=RemCount+ RemoveGroupRec(AX,AY-1,APBoard);
              APBoard^.LastCatchX:=AX;
            APBoard^.LastCatchY:=AY-1;
 
@@ -672,7 +811,7 @@ end;
         if CountLiberties(AX,AY+1,APBoard,True) = 0 then
 //        If not HasLiberties(AX,AY+1,APBoard,True) then
         begin
-         RemCount:= RemoveGroupRec(AX,AY+1,APBoard,MovesB,MovesW);
+         RemCount:= RemoveGroupRec(AX,AY+1,APBoard);
            APBoard^.LastCatchX:=AX;
            APBoard^.LastCatchY:=AY+1;
          end;
@@ -690,11 +829,13 @@ end;
     inc(APBoard^.MoveNr);
     Result := True;
   end;
-  function ReverseColor(AColor:SmallInt):SmallInt;
+
+  function ReverseColor(const AColor:SmallInt):SmallInt;
   begin
     if AColor = 1 then Result := 2 else Result:=1; //Assuming Valid Color;
   end;
-  function IsSuicide(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
+
+  function IsSuicide(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
   var enemyColor:SmallInt;lMarkedFields:TMarkList;lLen:SmallInt;
   begin
     Result := False;
@@ -767,15 +908,16 @@ end;
     //-------->>>>    SUICIDE!  <<<<----------
     Result:=True;
   end;
-  function IsValidMove(AX,AY:SmallInt;AColor:SmallInt;APBoard:PBoard):Boolean;
+
+  function IsValidMove(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
   begin
     Result := False;
      if (AX=0) and (AY=0) then
       Exit(True); //ofcourse passing is always valid.....gnarf
     //-----OUT OF BOUNDS-------
 
-    if AX=0 then exit;
-    if AY=0 then exit;
+    if AX<=0 then exit;
+    if AY<=0 then exit;
     if AX>BOARD_SIZE then exit;
     if AY>BOARD_SIZE then exit;
   //--------------------------
@@ -792,7 +934,8 @@ end;
   //No negative criteria matched---> VALID MOVE!
     Result:=True;
   end;
-  function IsKoValidMove(AX,AY:SmallInt;APBoard:PBoard):Boolean;
+
+  function IsKoValidMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
   var lMarkedFields:TMarkList; lLen:SmallInt;
   begin
     Result:=True;
@@ -804,6 +947,7 @@ end;
     //every ko criteria passed, so it's a ko!
     Result := False;
   end;
+
   function IsEqualField(const AX,AY,AOccupation:SmallInt;const APBoard:PBoard):Boolean;
   begin
     //result := False;
@@ -951,11 +1095,11 @@ end;
     //----------------------------------
   end;
 
-  function GetBoardHash(APBoard:PBoard):Int64;
+  function GetBoardHash(const APBoard:PBoard):Int64;
   begin
     //TODO: Implement hashing
   end;
-  function RemoveGroupRec(AX,AY:SmallInt;APBoard:PBoard;var MovesB,MovesW:TMoveList):SmallInt;
+  function RemoveGroupRec(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
   var ownCol:SmallInt; len:Integer;
   begin
     Result:=0;
@@ -967,23 +1111,23 @@ end;
     ownCol:=APBoard^.Occupation[AX,AY];
     APBoard^.Occupation[AX,AY]:=0; //delete this stone
     //------------ enable this field as valid move ----------
-    len:=length(MovesB);
+   { len:=length(MovesB);
     SetLength(MovesB,len+1);
     MovesB[len][1]:=AX;MovesB[len][2]:=AY;
 
     len:=length(MovesW);
     SetLength(MovesW,len+1);
-    MovesW[len][1]:=AX;MovesW[len][2]:=AY;
+    MovesW[len][1]:=AX;MovesW[len][2]:=AY;    }
     //------------- ---------------------
     Result:=1;
     //---------DELETE ALL OWN NEIGHBBOURS-----------
-        if APBoard^.Occupation[AX+1,AY] = ownCol then Result:=Result+RemoveGroupRec(AX+1,AY,APBoard,MovesB,MovesW);
-        if APBoard^.Occupation[AX-1,AY] = ownCol then Result:=Result+RemoveGroupRec(AX-1,AY,APBoard,MovesB,MovesW);
-        if APBoard^.Occupation[AX,AY+1] = ownCol then Result:=Result+RemoveGroupRec(AX,AY+1,APBoard,MovesB,MovesW);
-        if APBoard^.Occupation[AX,AY-1] = ownCol then Result:=Result+RemoveGroupRec(AX,AY-1,APBoard,MovesB,MovesW);
+        if APBoard^.Occupation[AX+1,AY] = ownCol then Result:=Result+RemoveGroupRec(AX+1,AY,APBoard);
+        if APBoard^.Occupation[AX-1,AY] = ownCol then Result:=Result+RemoveGroupRec(AX-1,AY,APBoard);
+        if APBoard^.Occupation[AX,AY+1] = ownCol then Result:=Result+RemoveGroupRec(AX,AY+1,APBoard);
+        if APBoard^.Occupation[AX,AY-1] = ownCol then Result:=Result+RemoveGroupRec(AX,AY-1,APBoard);
     //---------------------------------------
   end;
-  function RecMarkGroupSize(ARecX,ARecY:SmallInt;APBoard:PBoard;FirstCall:Boolean):SmallInt;
+  function RecMarkGroupSize(const ARecX,ARecY:SmallInt;const APBoard:PBoard;const FirstCall:Boolean):SmallInt;
   var memFlag:SmallInt;i,j:Integer;
   begin
     Result:=0;

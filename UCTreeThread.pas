@@ -2,8 +2,9 @@ unit UCTreeThread;
 
 interface
 uses
-  UCTree,Tree,BoardControls,DataTypes,MonteCarlo,System.Classes,System.SysUtils;
+  UCTree,Tree,BoardControls,DataTypes,MonteCarlo,System.Classes,System.SysUtils,Threading.Playout;
 type
+
   TUCTreeThread = class (TThread)
   private
     FBestX,FBestY:Integer;
@@ -13,9 +14,13 @@ type
     FUCTree:TUCTree;
     FWinrate:Double;
     FNodeCount:Int64;
+    FTreeLocked:Boolean;
+    FThreads:array[0..MC_MAX_THREADS-1] of TMCPlayoutThread;
     function PlayoutNode(ANode:PUCTData):Boolean; //true if player on turn wins
     procedure AddRandomSubNode(AParent:TTreeNode<TUCTNode>);
     function AddSpecificSubNode(AParent:TTreeNode<TUCTNode>;AX,AY:Integer):Boolean;
+    procedure OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer);
+    procedure SpawnMCThread(ANode:TTreeNode<TUCTNode>;APlayouts:Integer);
   protected
     procedure Execute;override;
   public
@@ -28,14 +33,80 @@ type
     property MovePlayoutsAMAF:Int64 read FMovePlayoutsAMAF;
     property AllPlayouts:Int64 read FAllPlayouts;
     property Tree:TUCTree read FUCTree; //NOT THREADSAFE !!!
-    destructor Destroy;
+    destructor Destroy;override;
   end;
 
 implementation
+
 destructor TUCTreeThread.Destroy;
+var
+  i:Integer;
 begin
-  FUCTree.Destroy;
   Inherited Destroy;
+  for i := 0 to MC_MAX_THREADS-1 do
+  begin
+    FThreads[i].Terminate;
+    FThreads[i].WaitFor;
+    FThreads[i].Free;
+  end;
+  FUCTree.Destroy;
+
+end;
+procedure TUCTreeThread.SpawnMCThread(ANode:TTreeNode<TUCTNode>;APlayouts:Integer);
+var
+  i:Integer;
+  LAssigned:Boolean;
+begin
+  {
+    lets search the first unoccupied thread
+    and assign the job to it
+
+    if there is no thread available, we just repeat the loop until we find one
+  }
+  repeat
+    LAssigned:=False;
+    for i := 0 to MC_MAX_THREADS-1 do
+    begin
+      if not FThreads[i].IsRunning then
+      begin
+        FThreads[i].AddJob(ANode.Content.Data.FBoard,APlayouts,ANode,OnMCThreadFinished,Self);
+        LAssigned:=true;
+        Break;
+      end;
+    end;
+  until LAssigned;
+
+end;
+
+procedure TUCTreeThread.OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer);
+var
+  AB:Integer;
+begin
+  while FTreeLocked do
+  begin
+    Sleep(0);
+  end;
+  {
+    update all white wins
+  }
+    FTreeLocked:=True;
+    if AWhiteWins > 0 then
+    begin
+      FUCTree.UpdatePlayout(ANode,True,True,False,AWhiteWins);
+      FUCTree.UpdateAllAMAFSiblings(ANode,FUCTree.RootNode,True,AWhiteWins);
+    end;
+
+  {
+    Update all black wins
+  }
+    AB:=APlayouts-AWhiteWins;
+    if AB > 0 then
+    begin
+      FUCTree.UpdatePlayout(ANode,False,True,False,AB);
+      FUCTree.UpdateAllAMAFSiblings(ANode,FUCTree.RootNode,False,AB);
+    end;
+
+   FTreeLocked:=False;
 end;
 
 function TUCTreeThread.AddSpecificSubNode(AParent:TTreeNode<TUCTNode>;AX,AY:Integer):Boolean;
@@ -44,13 +115,6 @@ function TUCTreeThread.AddSpecificSubNode(AParent:TTreeNode<TUCTNode>;AX,AY:Inte
   LUctNode:TUCTNode;
   LBoard:PBoard;
   LMoveList1,LMoveList2:TMoveList;
-  LSuccess:Boolean;
-  i,j:Integer;
-  LX,LY:Integer;
-  Ltmp:Integer;
-  LWhiteWin:Boolean;
-  LNode:TTreeNode<TUCTNode>;
-  LRandX,LRandY:array [1..BOARD_SIZE] of Integer;
 begin
   Result:=False;
    if Terminated then
@@ -81,7 +145,7 @@ begin
    if  IsValidMove(AX,AY,LBoard.PlayerOnTurn,LBoard) then
    begin
      Result:=True;
-     ExecuteMove(AX,AY,LBoard.PlayerOnTurn,LBoard,False,False,LMoveList1,LMoveList2);
+     ExecuteMove(AX,AY,LBoard.PlayerOnTurn,LBoard,False,False);
    end
    else
     Exit;
@@ -105,7 +169,7 @@ begin
    LUctNode.Data:= LPUCTData;
    LPUCTData.AssignedNode:=LUctNode;
    FUCtree.SetPointers(LUCTNode);
-   LNode:=AParent.AddChild(LUctNode);
+   AParent.AddChild(LUctNode);
    LUctNode.Parent:=AParent;
    {for i := 1 to 1 do
    begin
@@ -128,8 +192,6 @@ procedure TUCTreeThread.AddRandomSubNode(AParent:TTreeNode<TUCTNode>);
   i,j:Integer;
   LX,LY:Integer;
   Ltmp:Integer;
-  LWhiteWin:Boolean;
-  LNode:TTreeNode<TUCTNode>;
   LRandX,LRandY:array [1..BOARD_SIZE] of Integer;
 
 begin
@@ -176,7 +238,7 @@ begin
            LSuccess:=True;
            LX:=LRandX[i];
            LY:=LRandY[j];
-           ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,False,False,LMoveList1,LMoveList2);
+           ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,False,False);
            Break;
          end;
        end;
@@ -190,7 +252,7 @@ begin
       begin
         LX:=0;
         LY:=0;
-        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False,LMoveList1,LMoveList2);
+        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False);
       end
       else
       begin
@@ -218,7 +280,7 @@ begin
    LUctNode.Data:=LPUCTData;
    LPUCTData.AssignedNode:=LUctNode;
    FUCtree.SetPointers(LUCTNode);
-   LNode:=AParent.AddChild(LUctNode);
+   AParent.AddChild(LUctNode);
    LUctNode.Parent:=AParent;
 {   for i := 1 to 1 do
    begin
@@ -239,11 +301,11 @@ begin
 
 end;
 function TUCTreeThread.PlayoutNode(ANode:PUCTData):Boolean; //true if white wins
-var SimBoard:TBoard; score:Double;k:integer;
+var SimBoard:TBoard; score:Double;
     LWinningPlayer:SmallInt;
 begin
   Move(Anode.FBoard^,SimBoard,SizeOf(TBoard));
-  LWinningPlayer:= SingleMonteCarloWin(@SimBoard,score);
+  LWinningPlayer:= PlayoutPosition (@SimBoard,score);// SingleMonteCarloWin(@SimBoard,score);
   Result:=  LWinningPlayer = 1;
 end;
 
@@ -253,9 +315,8 @@ end;
   LUctNode:TUCTNode;
   LBoard:PBoard;
   LWhiteWin:Boolean;
-  i:integer;
  begin
-   inherited Create(True);
+   FTreeLocked:=False;
    LBoard:=new(PBoard);
    Move(ABoard,LBoard^,SizeOf(TBoard));
 
@@ -282,18 +343,23 @@ end;
    LWhiteWin:=PlayoutNode(LPUCTData);
    FUCTree.UpdatePlayout(FUCTree.RootNode,LWhiteWin,True);
    LUctNode.CalculateUCTValue;
-   Resume;
+   inherited Create(False);
  end;
  procedure TUCTreeThread.Execute;
  var
   LHighestNode:TTreeNode<TUCTNode>;
   LMoveNode:TTreeNode<TUCTNode>;
-  LLast:TTreeNode<TUCTNode>;
   Ply:Integer;
-  LWhiteWin:Boolean;
   i,j,k:Integer;
  begin
-
+ {
+  first we spawn our MC threads
+ }
+   NameThreadForDebugging('UCTThread');
+   for i := 0 to MC_MAX_THREADS-1 do
+   begin
+     FThreads[i]:=TMCPlayoutThread.Create;
+   end;
   //first lets add all possible moves as first nodes in the tree
   for i := 1 to BOARD_SIZE do
   begin
@@ -306,12 +372,16 @@ end;
 
 
 
-  i:=0;
-  while True do
+  while true do
   begin
+      while Suspended do
+      begin
+        sleep(0);
+        if Terminated then
+        Exit;
+      end;
       if Terminated then
         Exit;
-      inc(i);
 
        {
         First we start with the best UCT root node
@@ -323,7 +393,6 @@ end;
            {
             The highest node should never be nil here
            }
-         //   if LHighestNode.Depth>2 then Break;
            if LHighestNode = nil then
            begin
             break;
@@ -332,17 +401,22 @@ end;
            {
             If the node was never played out, we do so, and exit the loop
            }
-           if LHighestNode.Content.Data.WinsWhite+LHighestNode.Content.Data.WinsBlack < 10 then
+           if LHighestNode.Content.Data.WinsWhite+LHighestNode.Content.Data.WinsBlack < MC_MIN_NODE_PLAYOUT then
            begin
-             for j := 1 to 1 do
-             begin
-                LWhiteWin:=PlayoutNode(LHighestNode.Content.Data);
-                FUCTree.UpdatePlayout(LHighestNode,LWhiteWIn,True);
-                FUCTree.UpdateAllAMAFSiblings(LHighestNode,FUCTree.RootNode,LWhiteWin);
-             end;
-             Break;
+              SpawnMCThread(LHighestNode,MC_PLAYOUT_CHUNK_SIZE);
+              Break;
            end else
            begin
+
+             {
+              for the case we landed in a final position,
+              we update the score and just exit the loop
+             }
+             if LHighestNode.Content.Data.FBoard.Over then
+             begin
+                SpawnMCThread(LHighestNode,MC_PLAYOUT_CHUNK_SIZE);
+                Break;
+             end;
 
              {
               now, since the node was already played out,
@@ -359,7 +433,6 @@ end;
                   end;
                 end;
                  AddSpecificSubNode(LHighestNode,0,0);
-              //   AddRandomSubNode(LHighestNode);
                 LHighestNode.Content.Data.HasAllChilds:=true;
                 Break;
              end;
@@ -369,18 +442,9 @@ end;
                either a random with 0 visits
                or the best child
              }
-            { for i := 1 to 1 do
-             begin
-                LWhiteWin:=PlayoutNode(LHighestNode.Content.Data);
-                FUCTree.UpdatePlayout(LHighestNode,LWhiteWIn,True);
-                FUCTree.UpdateAllAMAFSiblings(LHighestNode,FUCTree.RootNode,LWhiteWin);
-             end;     }
-             if LHighestNode.Content.Data.FBoard.Over then
-              Break;
-            LHighestNode:=LHighestNode.GetHighestDirectChild(False);//not LHighestNode.Content.Data.HasAllChilds);
-           end;
+            LHighestNode:=LHighestNode.GetHighestDirectChild(False);
 
-       //  if LHighestNode.Depth>= 9 then Break;
+           end;
 
 
 

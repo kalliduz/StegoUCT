@@ -5,7 +5,7 @@ interface
 
 uses
   Classes,DataTypes,Windows,
-  StdCtrls,SysUtils,GameControl;
+  VCL.StdCtrls,SysUtils,GameControl;
  procedure HandleCommand(ACommand:TStringList);
  function ParseParams(Acommand:String):TStringList;
  function IsKnownCommand(ACommand:String):Boolean;
