@@ -11,6 +11,7 @@ uses DataTypes,Types;
     function RecMarkGroupSize(const ARecX,ARecY:SmallInt;const APBoard:PBoard;const FirstCall:Boolean):SmallInt;
     function IsValidMove(const AX,AY:SmallInt;const AColor:SmallInt;const APBoard:PBoard):Boolean;
     function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
+    function HasLiberties(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
     function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const AMatchColor:SmallInt; const AStopAfterTwo:Boolean):SmallInt;
     function CountLibertiesRec_(const AX,AY:SmallInt;const APBoard:PBoard;const AFirstCall:Boolean;const MarkedFields:PMarkList;var ALen:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
     function CountLibertiesIterative_(const AX,AY:SmallInt;const APBoard:PBoard):SmallInt;
@@ -55,7 +56,64 @@ implementation
 uses Math,System.Generics.Collections,Winapi.Windows;
 
 
+function HasLiberties(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+var
+  LCol:SmallInt;
+begin
+  {
+    if a direct neighbour is empty,
+    we can directly return true and exit
+  }
+  if APBoard.Occupation[AX-1,AY] = 0 then
+    Exit(True);
+  if APBoard.Occupation[AX+1,AY] = 0 then
+    Exit(True);
+  if APBoard.Occupation[AX,AY-1] = 0 then
+    Exit(True);
+  if APBoard.Occupation[AX,AY+1] = 0 then
+    Exit(True);
 
+  Result:=False;
+  LCol:=APBoard.Occupation[AX,AY];
+  try
+  {
+    we mark our current position as already visited
+  }
+  APBoard.Occupation[AX,AY] := 254;
+  {
+    now we just check, if any same colored neighbour has
+    any liberties and exit directly if so
+  }
+  if APBoard.Occupation[AX-1,AY] = LCol then
+    Result:= HasLiberties(AX-1,AY,APBoard);
+  if Result then
+    Exit(True);
+
+  if APBoard.Occupation[AX+1,AY] = LCol then
+    Result:= HasLiberties(AX+1,AY,APBoard);
+  if Result then
+    Exit(True);
+
+  if APBoard.Occupation[AX,AY-1] = LCol then
+    Result:= HasLiberties(AX,AY-1,APBoard);
+  if Result then
+    Exit(True);
+
+  if APBoard.Occupation[AX,AY+1] = LCol then
+    Result:= HasLiberties(AX,AY+1,APBoard);
+  if Result then
+    Exit(True);
+  finally
+    {
+      we move the removing of the mark in finally,
+      so we can exit inside the try block and avoid a lot of
+      if then logic
+    }
+    APBoard.Occupation[AX,AY] := LCol;
+  end;
+
+
+end;
 function WouldCaptureAnyThing(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
 var LCol:SmallInt;
 function IsInAtari(X,Y:SmallInt):Boolean;
@@ -765,8 +823,7 @@ end;
     APBoard^.LastMoveCatchedExactlyOne:=False;  //switch back the ko-marker
      if ALLOW_SUICIDE then
      begin
-        if CountLiberties(AX,AY,APBoard,True) = 0 then
-       // If not HasLiberties(AX,AY,APBoard,True) then
+        if not HasLiberties(AX,AY,APBoard) then
         begin
           RemCount:= RemoveGroupRec(AX,AY,APBoard);
            APBoard^.RemovedStones[AColor]:=APBoard^.RemovedStones[AColor]+RemCount;  //keep track of captured stones
@@ -776,7 +833,7 @@ end;
       RemCount:=0;
       If IsEqualField(AX-1,AY,enemyColor,APBoard) then
       begin
-        if CountLiberties(AX-1,AY,APBoard,True) = 0 then
+        if not HasLiberties(AX-1,AY,APBoard) then
 //        If not HasLiberties(AX-1,AY,APBoard,True) then
         begin
          RemCount:=RemCount+ RemoveGroupRec(AX-1,AY,APBoard);
@@ -786,7 +843,7 @@ end;
       end;
       If IsEqualField(AX+1,AY,enemyColor,APBoard) then
       begin
-        if CountLiberties(AX+1,AY,APBoard,True) = 0 then
+        if not HasLiberties(AX+1,AY,APBoard) then
 //        If not HasLiberties(AX+1,AY,APBoard,True) then
         begin
          RemCount:= RemCount+RemoveGroupRec(AX+1,AY,APBoard);
@@ -797,7 +854,7 @@ end;
       end;
       If IsEqualField(AX,AY-1,enemyColor,APBoard) then
       begin
-        if CountLiberties(AX,AY-1,APBoard,True) = 0 then
+        if not HasLiberties(AX,AY-1,APBoard) then
 //        If not HasLiberties(AX,AY-1,APBoard,True) then
         begin
          RemCount:=RemCount+ RemoveGroupRec(AX,AY-1,APBoard);
@@ -808,7 +865,7 @@ end;
       end;
       If IsEqualField(AX,AY+1,enemyColor,APBoard) then
       begin
-        if CountLiberties(AX,AY+1,APBoard,True) = 0 then
+        if not HasLiberties(AX,AY+1,APBoard) then
 //        If not HasLiberties(AX,AY+1,APBoard,True) then
         begin
          RemCount:= RemoveGroupRec(AX,AY+1,APBoard);
