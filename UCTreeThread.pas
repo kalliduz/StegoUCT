@@ -15,6 +15,7 @@ type
     FWinrate:Double;
     FNodeCount:Int64;
     FTreeLocked:Boolean;
+    FDynKomi:Double;
     FThreads:array[0..MC_MAX_THREADS-1] of TMCPlayoutThread;
     function PlayoutNode(ANode:PUCTData):Boolean; //true if player on turn wins
     procedure AddRandomSubNode(AParent:TTreeNode<TUCTNode>);
@@ -24,7 +25,7 @@ type
   protected
     procedure Execute;override;
   public
-    constructor Create(ABoard:TBoard);
+    constructor Create(ABoard:TBoard;const ADynKomi:Double = 0);
     property BestX:Integer read FBestX;
     property BestY:Integer read FBestY;
     property Winrate:Double read FWinrate;
@@ -33,6 +34,7 @@ type
     property MovePlayoutsAMAF:Int64 read FMovePlayoutsAMAF;
     property AllPlayouts:Int64 read FAllPlayouts;
     property Tree:TUCTree read FUCTree; //NOT THREADSAFE !!!
+    property DynKomi:Double read FDynKomi;
     destructor Destroy;override;
   end;
 
@@ -69,7 +71,7 @@ begin
     begin
       if not FThreads[i].IsRunning then
       begin
-        FThreads[i].AddJob(ANode.Content.Data.FBoard,APlayouts,ANode,OnMCThreadFinished,Self);
+        FThreads[i].AddJob(ANode.Content.Data.FBoard,APlayouts,ANode,OnMCThreadFinished,Self,FDynKomi);
         LAssigned:=true;
         Break;
       end;
@@ -309,7 +311,7 @@ begin
   Result:=  LWinningPlayer = 1;
 end;
 
- constructor TUCTreeThread.Create(ABoard:TBoard);
+ constructor TUCTreeThread.Create(ABoard:TBoard;const ADynKomi:Double);
  var
   LPUCTData:PUCTData;
   LUctNode:TUCTNode;
@@ -317,6 +319,7 @@ end;
   LWhiteWin:Boolean;
  begin
    FTreeLocked:=False;
+   FDynKomi:=ADynKomi;
    LBoard:=new(PBoard);
    Move(ABoard,LBoard^,SizeOf(TBoard));
 

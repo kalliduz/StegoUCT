@@ -34,11 +34,11 @@ uses DataTypes,Types;
     function WouldCaptureLastMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
     function WouldCaptureAnyThing_(const AX,AY:SmallInt;const APboard:PBoard):SmallInt;
     function WouldCaptureAnyThing(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
+
   //-----------------------------------------------------------
 
   function GetBoardHash(const APBoard:PBoard):Int64;
-  function CountScore(const APBoard:PBoard):Double;
-
+   function CountScore(const APBoard:PBoard;const ADynKomi:Double = 0):Double;
   //-----VALID MOVES NEEDED----------------
 
   function IsKoValidMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
@@ -715,10 +715,10 @@ end;
 
      Result :=True;
    end;
-   function CountScore(const APBoard:PBoard):Double;
+   function CountScore(const APBoard:PBoard;const ADynKomi:Double):Double;
    var i,j:integer;occ:SmallInt;Stones:Integer;
    begin
-     Result:=KOMI;
+     Result:=KOMI+ADynKomi;
     // Stones:=APBoard^.MoveNr div 2;
    //  Result:=Result// -(Stones+1)  //black stones in the game  (one more than whites..)
 //              +(APBoard^.RemovedStones[2]) // captured black stones removed from black points, added to white points

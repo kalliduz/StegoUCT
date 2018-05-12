@@ -12,6 +12,7 @@ type
     FWhiteWins:Integer;
     FBoard:PBoard;
     FPlayOuts:Integer;
+    FDynKomi:Double;
     FCallingThread:TThread;
     FOnFinish:TOnThreadFinishedCallBack;
     FNode:TTreeNode<TUCTNode>;
@@ -21,7 +22,7 @@ type
     procedure Execute;override;
   public
     property IsRunning:Boolean read FIsRunning;
-    function AddJob(ABoard:PBoard;APlayouts:Integer;ACallingNode:TTreeNode<TUCTNode>;ACallBack:TOnThreadFinishedCallBack;ACallingThread:TThread):Boolean;
+    function AddJob(ABoard:PBoard;APlayouts:Integer;ACallingNode:TTreeNode<TUCTNode>;ACallBack:TOnThreadFinishedCallBack;ACallingThread:TThread;const ADynKomi:Double =0):Boolean;
     constructor Create;
     end;
 
@@ -41,7 +42,7 @@ begin
   begin
 
     Move(FBoard^,LSimBoard,SizeOf(TBoard));
-    LWinner:= PlayoutPosition (@LSimBoard,LScore);
+    LWinner:= PlayoutPosition (@LSimBoard,LScore,FDynKomi);
 
     if  LWinner = 1
     then
@@ -52,7 +53,7 @@ begin
  // Synchronize(FCallingThread,SynchResults);
 end;
 
-function TMCPlayoutThread.AddJob(ABoard:PBoard;APlayouts:Integer;ACallingNode:TTreeNode<TUCTNode>;ACallBack:TOnThreadFinishedCallBack;ACallingThread:TThread):Boolean;
+function TMCPlayoutThread.AddJob(ABoard:PBoard;APlayouts:Integer;ACallingNode:TTreeNode<TUCTNode>;ACallBack:TOnThreadFinishedCallBack;ACallingThread:TThread;const ADynKomi:Double):Boolean;
 begin
   if FIsRunning then
   begin
@@ -63,6 +64,7 @@ begin
   Move(ABoard^,FBoard^,SizeOf(TBoard));
   FPlayOuts:=APlayouts;
   FNode:=ACallingNode;
+  FDynKomi:=ADynKomi;
   FOnFinish:=ACallBack;
   FCallingThread:=ACallingThread;
   FIsRunning:=True;

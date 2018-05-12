@@ -18,6 +18,8 @@ TGameStatus = record
   TimeTicker:Int64;
 end;
 
+TGameOverEvent = procedure(const AScore:Double) of object;
+
 TGameManager=class
   private
     FBoard:TBoard;
@@ -34,6 +36,9 @@ TGameManager=class
     FDisplayRating:Boolean;
     FDisplayRatingOverlay:Boolean;
     FGTpMode:Boolean;
+    FDynKomi:Double;
+
+    FOnGameOver:TGameOverEvent;
 
     FLastPlayOuts:Int64;
     procedure OnDisplayTimer(Sender:TObject);
@@ -64,6 +69,7 @@ TGameManager=class
     function AquireTree:TUCTree;
     procedure ReleaseTree;
     function ShouldResign:Boolean;
+    property OnGameOver:TGameOverEvent read FOnGameOver write FOnGameOver;
 end;
 
 implementation
@@ -87,7 +93,7 @@ implementation
     end;
     procedure TGameManager.CreateThreads;
     begin
-      FThinkThread:=TUCTreeThread.Create(FBoard);
+      FThinkThread:=TUCTreeThread.Create(FBoard,FDynKomi);
     end;
   procedure TGameManager.SetInfoDisplay(ADisplay:TImage);
   begin
@@ -205,8 +211,10 @@ implementation
   procedure TGameManager.MoveNow(X,Y:SmallInt);
   var l:SmallInt; Lx,Ly:Integer;
   begin
+
     if not Assigned(FThinkThread) then
       Exit;
+
 
     CalculateNewTime;
     StopThreads;
@@ -219,6 +227,14 @@ implementation
                 False
                 ) then
    ShowMessage('Invalid Move');
+   if FBoard.Over then
+   begin
+     if Assigned(FOnGameOver) then
+     begin
+      FOnGameOver(CountScore(@FBoard));
+     end;
+     Exit;
+   end;
     CalculateNewTime;
    // UseOldUCTAt(X,Y);
     CreateThreads;
@@ -242,8 +258,17 @@ implementation
       x:=FThinkThread.BestX;
       y:=FThinkThread.BestY;
     end;
-   // StartThreads;
     CalculateNewTime;
+   {
+    calculate new dynkomi
+   }
+   if USE_DYN_KOMI then
+   begin
+    if FThinkThread.Winrate > 0.6 then
+      FDynKomi:=FDynKomi-1;
+    if FThinkThread.Winrate < 0.4 then
+      FDynKomi:=FDynKomi+1;
+   end;
     MoveNow(X,Y);
   end;
   procedure TGameManager.OnThinkTimer(Sender:TObject);
@@ -296,6 +321,7 @@ implementation
       gameInfo.PlayoutsXY:=FThinkThread.MovePlayouts;
       gameInfo.PlayoutsXYAMAF:=FThinkThread.MovePlayoutsAMAF;
       gameInfo.PlayoutsAll:=FThinkThread.AllPlayouts;
+      gameInfo.DynKomi:=FDynKomi;
 
       gameInfo.BestResponseWinrate:=-1; //TODO Implement
       StartThreads;

@@ -72,7 +72,7 @@ type
   end;
 
 
-  function PlayoutPosition(const ABoard:PBoard;out Score:Double):SmallInt;
+  function PlayoutPosition(const ABoard:PBoard;out Score:Double;const ADynKomi:Double = 0):SmallInt;
 
 
 implementation
@@ -285,7 +285,7 @@ end;
     FPlayerMoveLists[APlayer][len].Probability:=1;
   end;
 
-  function PlayoutPosition(const ABoard:PBoard;out Score:Double):SmallInt;
+  function PlayoutPosition(const ABoard:PBoard;out Score:Double;const ADynKomi:Double):SmallInt;
   var
     LMoveGen:TMoveGenerator;
     LMove:TPoint;
@@ -327,7 +327,7 @@ end;
 
         if ABoard.Over then
         begin
-          Score:= CountScore(ABoard);
+          Score:= CountScore(ABoard,ADynKomi);
           if Score>0 then
             Exit(1)
           else

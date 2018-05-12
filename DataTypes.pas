@@ -18,6 +18,8 @@ interface
     //turn on for chinese rules
     ALLOW_SUICIDE = FALSE;
 
+    USE_DYN_KOMI = TRUE;
+
     //if the adaptive winrate for computerplayer is lower, it will resign
     RESIGN_TRESHOLD = 0.15;
 
@@ -112,6 +114,7 @@ type
     BestMoveWinrate:Double;
     BestResponseX,BestResponseY:SmallInt;
     BestResponseWinrate:Double;
+    DynKomi:Double;
 
   end;
   THistogrammTable = array [-HISTOGRAMM_RANGE..HISTOGRAMM_RANGE] of Int64;
