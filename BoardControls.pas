@@ -49,11 +49,16 @@ uses DataTypes,Types;
 threadvar
   LRecursionCounter:Integer;
   TopMark,LeftMark,BotMark,RightMark:Integer;
-
+  GMarkedLiberties:array[0..BOARD_SIZE*BOARD_SIZE] of TPoint;
+  GMarkedStones:array[0..BOARD_SIZE*BOARD_SIZE] of TPoint;
+  GStoneIndex:Integer;
+  GLibertyIndex:Integer;
 implementation
 
 
 uses Math,System.Generics.Collections,Winapi.Windows;
+
+
 
 
 function HasLiberties(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
@@ -80,6 +85,7 @@ begin
     we mark our current position as already visited
   }
   APBoard.Occupation[AX,AY] := 254;
+
   {
     now we just check, if any same colored neighbour has
     any liberties and exit directly if so
@@ -160,20 +166,17 @@ begin
   begin
     if APBoard.Occupation[X,Y] = 0 then
     begin
-      if X>RightMark then
-        RightMark:=X;
-      if X<LeftMark then
-        LeftMark:=X;
-      if Y>BotMark then
-        BotMark:=Y;
-      if Y<TopMark then
-        TopMark:=Y;
-      APBoard.Occupation[X,Y] := 254; //so now 0 fields are 254
-      Inc(Result);
-      Inc(LRecursionCounter);
       {
         if the field is empty, its a group liberty, so we count and mark it
       }
+      APBoard.Occupation[X,Y] := 254; //so now 0 fields are 254
+      Inc(Result);
+      Inc(LRecursionCounter);
+     {
+       also we add it to the liberty cleanup list for later
+     }
+     GMarkedLiberties[GLibertyIndex]:=Point(X,Y);
+     inc(GLibertyIndex);
     end;
   end;
 end;
@@ -186,22 +189,20 @@ begin
     Exit;
   if ((AStopAfterTwo) AND (LRecursionCounter >= 2)) then
     Exit;
-  //we can assume this is a valid stone, because otherwise this proc
-  //wouldn't have been called
+
   {
-    we mark with different value here, so we can turn them back
+    we mark the stone so he won't be visited again.
+    Also we add him to the cleanup list for later
   }
-  if AX>RightMark then
-    RightMark:=AX;
-  if AX<LeftMark then
-    LeftMark:=AX;
-  if AY>BotMark then
-    BotMark:=AY;
-  if AY<TopMark then
-    TopMark:=AY;
-  if AMatchColor = 1  then
-  APBoard.Occupation[AX,AY]:=3 else
-  APBoard.Occupation[AX,AY]:=4;   //so lets mark it as a group stone before we call the recursion
+
+  APBoard.Occupation[AX,AY]:=3;
+  GMarkedStones[GStoneIndex]:=Point(AX,AY);
+  inc(GStoneIndex);
+
+  {
+    we add all liberties of substones
+  }
+
   Result:= Result + MarkAndCall(AX-1,AY,APBoard,AMatchColor,AStopAfterTwo);
   Result:= Result + MarkAndCall(AX+1,AY,APBoard,AMatchColor,AStopAfterTwo);
   Result:= Result + MarkAndCall(AX,AY-1,APBoard,AMatchColor,AStopAfterTwo);
@@ -210,7 +211,8 @@ end;
 
 function CountLiberties(const AX,AY:SmallInt;const APBoard:PBoard;const AStopAfterTwo:Boolean):SmallInt;
 var
-  i,j:Integer;
+  i:Integer;
+  LCol:SmallInt;
 begin
     if AStopAfterTwo then
       LRecursionCounter:=0;
@@ -220,45 +222,26 @@ begin
     if AY=0 then exit;
     if AX>BOARD_SIZE then exit;
     if AY>BOARD_SIZE then exit;
+    GStoneIndex:=0;
+    GLibertyIndex:=0;
 
 
-    {
-      for faster cleanup, we remember how big the rectangle around
-      the counted group was, so we don't need to cleanup everything
-    }
-    TopMark:=BOARD_SIZE;
-    LeftMark:=BOARD_SIZE;
-    RightMark:=1;
-    BotMark:=1;
+
 
     try
-
-      Result:= CountLibertiesRecursive(AX,AY,APBoard,APBoard.Occupation[AX,AY],AStopAfterTwo);
+      LCol:=APBoard.Occupation[AX,AY];
+      Result:= CountLibertiesRecursive(AX,AY,APBoard,LCol,AStopAfterTwo);
     finally
       {
-        cleanup the marks
+        we remembered all the marked stones and liberties, so we can cleanup them now
       }
-      for i := LeftMark to RightMark do
-      begin
-        for j := TopMark to BotMark do
-        begin
-          if APBoard.Occupation[i,j] = 254 then
-          begin
-            APBoard.Occupation[i,j]:=0;
-            Continue;
-          end;
-          if APBoard.Occupation[i,j] = 3 then
-          begin
-            APBoard.Occupation[i,j]:=1;
-            Continue;
-          end;
-          if APBoard.Occupation[i,j] = 4 then
-          begin
-            APBoard.Occupation[i,j]:=2;
-            Continue;
-          end;
-        end;
-      end;
+      for i  := 0 to GStoneIndex-1 do
+        APBoard.Occupation[GMarkedStones[i].X,GMarkedStones[i].Y]:=LCol;
+
+      for i := 0 to GLibertyIndex-1 do
+        APBoard.Occupation[GMarkedLiberties[i].X,GMarkedLiberties[i].Y]:=0;
+
+
     end;
 
 end;

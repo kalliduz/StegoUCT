@@ -102,9 +102,9 @@ end;
 
   constructor TMoveGenerator.Create;
   begin
-    RegisterHeuristic(TAntiSelfAtariHeuristic);
+   { RegisterHeuristic(TAntiSelfAtariHeuristic);
     RegisterHeuristic(TCaptureHeuristic);
-    RegisterHeuristic(TRunAwayHeuristic);
+    RegisterHeuristic(TRunAwayHeuristic); }
   end;
 
   procedure TMoveGenerator.ApplyHeuristics(const APlayer:SmallInt);

@@ -16,6 +16,7 @@ type
     IsValid:Boolean;
     WinsWhite:Int64;
     WinsBlack:Int64;
+    ScoreSum:Double;
     WinsWhiteAMAF:Int64;
     WinsBlackAMAF:Int64;
     UCTVal:Double;
@@ -60,7 +61,7 @@ type
       function UpdateAllAMAFSiblings(AAMAFNode:TTreeNode<TUCTNode>;ARootNode:TTreeNode<TUCTNode>;AIsWhiteWin:Boolean;const AAmount:Integer=1):Boolean;
 
                                                         // Maybe a "key" value in the treenode
-    procedure UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1);
+    procedure UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1;const AScoreSum:Double = 0);
     constructor Create(ARootNodeData:TUCTNode);reintroduce;
   end;
 
@@ -135,7 +136,7 @@ begin
   ANodeData.Data.WinsBlackTotal:=@FWinsBlackTotal;
 end;
 
-procedure TUCTree.UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1);
+procedure TUCTree.UpdatePlayout(ANode:TTreeNode<TUCTNode>;AIsWinWhite:Boolean;AIsInitialNode:Boolean;const AIsAMAFUPdate:Boolean = false;const AAmount:Integer=1;const AScoreSum:Double=0);
 var
   LPUCTData:PUCTData;
 begin
@@ -146,6 +147,10 @@ begin
    LPUCTData:=nil;
   end;
   LPUCTData:=ANode.Content.GetData;
+  {
+    first we update the summed up scores
+  }
+  LPUCTData.ScoreSum:=LPUCTData.ScoreSum+AScoreSum;
   {
     We update the statistic here to get the value for AMAF total playouts after N-th move
   }
@@ -179,7 +184,7 @@ begin
 end;
   Anode.Content.GetData.ISUCTUpToDate:=False;
   ANode.Content.CalculateUCTValue;
-  UpdatePlayout(ANode.Parent,AIsWinWhite,False,AIsAMAFUPdate,AAmount);
+  UpdatePlayout(ANode.Parent,AIsWinWhite,False,AIsAMAFUPdate,AAmount,AScoreSum);
 
 end;
 

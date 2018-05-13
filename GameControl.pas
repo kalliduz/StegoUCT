@@ -264,10 +264,11 @@ implementation
    }
    if USE_DYN_KOMI then
    begin
-    if FThinkThread.Winrate > 0.6 then
-      FDynKomi:=FDynKomi-1;
-    if FThinkThread.Winrate < 0.4 then
-      FDynKomi:=FDynKomi+1;
+      if (FThinkThread.ExpectedScore>(BOARD_SIZE*BOARD_SIZE)/10) OR
+         (FThinkThread.ExpectedScore<(-(BOARD_SIZE*BOARD_SIZE)/10))
+      then
+        FDynKomi:=FDynKomi-(FThinkThread.ExpectedScore/2);
+
    end;
     MoveNow(X,Y);
   end;
@@ -322,6 +323,7 @@ implementation
       gameInfo.PlayoutsXYAMAF:=FThinkThread.MovePlayoutsAMAF;
       gameInfo.PlayoutsAll:=FThinkThread.AllPlayouts;
       gameInfo.DynKomi:=FDynKomi;
+      gameInfo.ExpectedScore:=round(FThinkThread.ExpectedScore*100)/100;
 
       gameInfo.BestResponseWinrate:=-1; //TODO Implement
       StartThreads;

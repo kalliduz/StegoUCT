@@ -5,13 +5,14 @@ uses
   System.Classes,MonteCarlo,UCTree,Tree,DataTypes,BoardControls;
 
 type
-  TOnThreadFinishedCallBack = procedure(ACaller:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer) of object;
+  TOnThreadFinishedCallBack = procedure(ACaller:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer;AScoreSum:Double) of object;
   TMCPlayoutThread = class(TThread)
   private
     FIsRunning:Boolean;
     FWhiteWins:Integer;
     FBoard:PBoard;
     FPlayOuts:Integer;
+    FScoreSum:Double;
     FDynKomi:Double;
     FCallingThread:TThread;
     FOnFinish:TOnThreadFinishedCallBack;
@@ -43,6 +44,7 @@ begin
 
     Move(FBoard^,LSimBoard,SizeOf(TBoard));
     LWinner:= PlayoutPosition (@LSimBoard,LScore,FDynKomi);
+    FScoreSum:=FScoreSum+LScore;
 
     if  LWinner = 1
     then
@@ -66,6 +68,7 @@ begin
   FNode:=ACallingNode;
   FDynKomi:=ADynKomi;
   FOnFinish:=ACallBack;
+  FScoreSum:=0;
   FCallingThread:=ACallingThread;
   FIsRunning:=True;
 
@@ -73,7 +76,7 @@ end;
 
 procedure TMCPlayoutThread.SynchResults;
 begin
-  FOnFinish(FNode,FPlayOuts,FWhiteWins);
+  FOnFinish(FNode,FPlayOuts,FWhiteWins,FScoreSum);
   Dispose(FBoard);
   FBoard:=nil;
 end;

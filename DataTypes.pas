@@ -71,7 +71,7 @@ interface
 ////////////////////////////////
 
     //theoretically sqrt(2), bigger values -> broader tree
-    EXPLORATION_FACTOR=0.3;
+    EXPLORATION_FACTOR=1;
 
      // amaf value for a node decreases linear until this node was played out X times
     ALPHA_AMAF_MINMOVES = 10000;
@@ -115,6 +115,7 @@ type
     BestResponseX,BestResponseY:SmallInt;
     BestResponseWinrate:Double;
     DynKomi:Double;
+    ExpectedScore:Double;
 
   end;
   THistogrammTable = array [-HISTOGRAMM_RANGE..HISTOGRAMM_RANGE] of Int64;

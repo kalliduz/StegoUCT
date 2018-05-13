@@ -42,6 +42,7 @@ implementation
    lText:=lText+'Move AMAF playouts: '+inttostr(AGameInformation.PlayoutsXYAMAF)+#13#10;
    lText:=lText+'Playouts total: '+inttostr(AGameInformation.PlayoutsAll)+#13#10;
    lText:=lText+'DynKomi: '+floattostr(AGameInformation.DynKomi)+#13#10;
+   LText:=lText+'Expected Score: '+floattostr(AGameInformation.ExpectedScore)+#13#10;
    lText:=lText+'Best sequence:'+#13#10
    +'['+inttostr(AGameInformation.BestMoveX)+', '+inttostr(AGameInformation.BestMoveY)+'] ('+floattostr(round(AGameInformation.BestMoveWinrate*100)/100)+' %)'+#13#10
    +'['+inttostr(AGameInformation.BestResponseX)+', '+inttostr(AGameInformation.BestResponseY)+'] ('+floattostr(round(AGameInformation.BestResponseWinrate*100)/100)+' %)'+#13#10;

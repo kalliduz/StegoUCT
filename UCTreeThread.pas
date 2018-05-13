@@ -8,6 +8,7 @@ type
   TUCTreeThread = class (TThread)
   private
     FBestX,FBestY:Integer;
+    FExpectedScore:Double;
     FMovePlayouts:Int64;
     FMovePlayoutsAMAF:Int64;
     FAllPlayouts:Int64;
@@ -20,7 +21,7 @@ type
     function PlayoutNode(ANode:PUCTData):Boolean; //true if player on turn wins
     procedure AddRandomSubNode(AParent:TTreeNode<TUCTNode>);
     function AddSpecificSubNode(AParent:TTreeNode<TUCTNode>;AX,AY:Integer):Boolean;
-    procedure OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer);
+    procedure OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer;AScoreSum:Double);
     procedure SpawnMCThread(ANode:TTreeNode<TUCTNode>;APlayouts:Integer);
   protected
     procedure Execute;override;
@@ -35,6 +36,7 @@ type
     property AllPlayouts:Int64 read FAllPlayouts;
     property Tree:TUCTree read FUCTree; //NOT THREADSAFE !!!
     property DynKomi:Double read FDynKomi;
+    property ExpectedScore:Double read FExpectedScore;
     destructor Destroy;override;
   end;
 
@@ -80,7 +82,7 @@ begin
 
 end;
 
-procedure TUCTreeThread.OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer);
+procedure TUCTreeThread.OnMCThreadFinished(ANode:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer;AScoreSum:Double);
 var
   AB:Integer;
 begin
@@ -90,11 +92,13 @@ begin
   end;
   {
     update all white wins
+    with the white wins, we also update the summed up scores
   }
     FTreeLocked:=True;
+
     if AWhiteWins > 0 then
     begin
-      FUCTree.UpdatePlayout(ANode,True,True,False,AWhiteWins);
+      FUCTree.UpdatePlayout(ANode,True,True,False,AWhiteWins,AScoreSum);
       FUCTree.UpdateAllAMAFSiblings(ANode,FUCTree.RootNode,True,AWhiteWins);
     end;
 
@@ -104,7 +108,13 @@ begin
     AB:=APlayouts-AWhiteWins;
     if AB > 0 then
     begin
-      FUCTree.UpdatePlayout(ANode,False,True,False,AB);
+      {
+        if we don't ahve any white wins to update, we need to update the scores together with the black wins
+      }
+      if AWhiteWins = 0 then
+        FUCTree.UpdatePlayout(ANode,False,True,False,AB,AScoreSum)
+      else
+        FUCTree.UpdatePlayout(ANode,False,True,False,AB);
       FUCTree.UpdateAllAMAFSiblings(ANode,FUCTree.RootNode,False,AB);
     end;
 
@@ -461,7 +471,9 @@ end;
 
       FBestX:=LMoveNode.Content.Data.X;
       FBestY:=LMoveNode.Content.Data.Y;
+
       Ply:=LMoveNode.Content.Data.WinsWhite+LMoveNode.Content.Data.WinsBlack;
+      FExpectedScore:=LMoveNode.Content.Data.ScoreSum/Ply;
       if Ply>0 then
         FWinrate:=LMoveNode.Content.Data.WinsWhite/Ply
       else
