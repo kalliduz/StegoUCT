@@ -105,7 +105,6 @@ type
   TGameInformation = record
     MemoryUsed:Int64;
     MaxMemory:Int64;
-    PlyPerSec:Int64;
     NodeCount:Int64;
     PlayoutsXY:Int64;
     PlayoutsXYAMAF:Int64;
