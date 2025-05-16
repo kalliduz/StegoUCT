@@ -21,7 +21,7 @@ interface
     USE_DYN_KOMI = TRUE;
 
     //if the adaptive winrate for computerplayer is lower, it will resign
-    RESIGN_TRESHOLD = 0.15;
+    RESIGN_THRESHOLD = 0.15;
 
     MAX_MEMORY = 1473741824; //2GB
 

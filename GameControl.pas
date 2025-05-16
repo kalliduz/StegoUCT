@@ -99,8 +99,8 @@ begin
   by:= FThinkThread.BestY;
   wr:=FThinkThread.Winrate;
   Result:=False;
-  if FBoard.PlayerOnTurn=1 then if wr< RESIGN_TRESHOLD then Result:=True;
-  if FBoard.PlayerOnTurn=2 then if wr>(1-RESIGN_TRESHOLD) then Result:=True;
+  if FBoard.PlayerOnTurn=1 then if wr< RESIGN_THRESHOLD then Result:=True;
+  if FBoard.PlayerOnTurn=2 then if wr>(1-RESIGN_THRESHOLD) then Result:=True;
 end;
 
 destructor TGameManager.Destroy();

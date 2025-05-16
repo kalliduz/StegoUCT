@@ -171,15 +171,15 @@ end;
       high probabilites and the problem of missing granularity.
       But for our case, this should fit.
     }
-    for i := 0 to FMoveCounts[APlayer]-1 do
-    begin
-      for j := 0 to round(FPlayerMoveLists[APlayer][i].Probability) do
+      for i := 0 to FMoveCounts[APlayer]-1 do
       begin
-        inc(LIndex);
-        setlength(FProbabilityList,LIndex+1);
-        FProbabilityList[LIndex]:=i;
+        for j := 1 to round(FPlayerMoveLists[APlayer][i].Probability) do
+        begin
+          inc(LIndex);
+          setlength(FProbabilityList,LIndex+1);
+          FProbabilityList[LIndex]:=i;
+        end;
       end;
-    end;
 
 
   end;

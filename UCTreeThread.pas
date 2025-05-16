@@ -264,13 +264,12 @@ begin
       begin
         LX:=0;
         LY:=0;
-        ExecuteMove(LRandX[i],LRandY[j],LBoard.PlayerOnTurn,LBoard,True,False);
+        ExecuteMove(LX,LY,LBoard.PlayerOnTurn,LBoard,True,False);
       end
       else
       begin
         AParent.Content.Data.HasAllChilds:=True;
         Exit;
-        Exit; //if two players passed, nothing more to do here.
       end;
    end;
    LPUCTData.X:=LX;
