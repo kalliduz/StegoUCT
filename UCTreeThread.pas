@@ -2,7 +2,13 @@ unit UCTreeThread;
 
 interface
 uses
-  UCTree,Tree,BoardControls,DataTypes,MonteCarlo,System.Classes,System.SysUtils,Threading.Playout;
+  UCTree,Tree,BoardControls,DataTypes,MonteCarlo,
+  {$IFDEF FPC}
+  Classes,SysUtils,
+  {$ELSE}
+  System.Classes,System.SysUtils,
+  {$ENDIF}
+  Threading.Playout;
 type
 
   TUCTreeThread = class (TThread)

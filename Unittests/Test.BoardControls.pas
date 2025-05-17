@@ -9,13 +9,32 @@ unit Test.BoardControls;
 
 }
 interface
+{$IFDEF FPC}
+uses
+  Classes, SysUtils, fpcunit, testutils, testregistry,
+  DataTypes,
+  BoardControls;
+{$ELSE}
 uses
   DUnitX.TestFramework,
   DataTypes,
   BoardControls;
+{$ENDIF}
 
 type
-
+{$IFDEF FPC}
+  TTestBoardControls = class(TTestCase)
+  protected
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestIsSuicide;
+    procedure TestReverseColor;
+    procedure TestWouldCaptureAnyThing;
+    procedure TestCountLiberties;
+    procedure TestIsSelfAtari;
+  end;
+{$ELSE}
   [TestFixture]
   TTestBoardControls = class(TObject)
   public
@@ -40,8 +59,45 @@ type
     [Test]
     procedure TestIsSelfAtari;
   end;
+{$ENDIF}
 
 implementation
+{$IFDEF FPC}
+type
+  Assert = class
+  public
+    class procedure AreEqual(const Expected, Actual: Integer); overload; static;
+    class procedure AreEqual(const Expected, Actual: Boolean); overload; static;
+    class procedure AreEqualMemory(Expected, Actual: Pointer; Size: PtrUInt); static;
+    class procedure IsTrue(Condition: Boolean); static;
+    class procedure IsFalse(Condition: Boolean); static;
+  end;
+
+class procedure Assert.AreEqual(const Expected, Actual: Integer);
+begin
+  AssertEquals(Expected, Actual);
+end;
+
+class procedure Assert.AreEqual(const Expected, Actual: Boolean);
+begin
+  AssertEquals(Expected, Actual);
+end;
+
+class procedure Assert.AreEqualMemory(Expected, Actual: Pointer; Size: PtrUInt);
+begin
+  AssertTrue(CompareMem(Expected, Actual, Size));
+end;
+
+class procedure Assert.IsTrue(Condition: Boolean);
+begin
+  AssertTrue(Condition);
+end;
+
+class procedure Assert.IsFalse(Condition: Boolean);
+begin
+  AssertFalse(Condition);
+end;
+{$ENDIF}
 procedure TTestBoardControls.TestWouldCaptureAnyThing;
 var
   LX,LY:Integer;
@@ -250,5 +306,8 @@ end;
 
 
 initialization
+{$IFDEF FPC}
+  RegisterTest(TTestBoardControls);
+{$ENDIF}
 
 end.

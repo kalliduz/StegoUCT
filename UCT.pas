@@ -1,7 +1,12 @@
 unit UCT;
 
 interface
-  uses DataTypes,BoardControls,Windows,SyncObjs;
+  uses DataTypes,BoardControls,
+  {$IFDEF FPC}
+  SyncObjs;
+  {$ELSE}
+  Windows,SyncObjs;
+  {$ENDIF}
 
   const
   MIN_TREE_WIDTH = 1;
