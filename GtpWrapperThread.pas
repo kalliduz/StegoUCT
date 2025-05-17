@@ -4,8 +4,13 @@ unit GtpWrapperThread;
 interface
 
 uses
-  Classes,DataTypes,Windows,
-  VCL.StdCtrls,SysUtils,GameControl;
+  Classes,DataTypes,
+  {$IFDEF FPC}
+  StdCtrls,
+  {$ELSE}
+  Windows, VCL.StdCtrls,
+  {$ENDIF}
+  SysUtils,GameControl;
  procedure HandleCommand(ACommand:TStringList);
  function ParseParams(Acommand:String):TStringList;
  function IsKnownCommand(ACommand:String):Boolean;

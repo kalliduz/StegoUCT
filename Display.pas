@@ -1,7 +1,11 @@
 unit Display;
 
 interface
+{$IFDEF FPC}
+uses Classes,Graphics, DataTypes,ExtCtrls,SysUtils;
+{$ELSE}
 uses Classes,Windows, VCL.Graphics, DataTypes,VCL.ExtCtrls,SysUtils;
+{$ENDIF}
 procedure PaintEmptyBoard(ADrawImage:TImage;ABoardSize:Integer);
 function CalcStoneSize(ADrawImage:TImage;ABoardSize:Integer):Double;inline;
 procedure PaintOccupation(ADrawImage:TImage;ABoardSize:Integer;ABoard:PBoard);

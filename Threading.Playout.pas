@@ -2,7 +2,12 @@ unit Threading.Playout;
 
 interface
 uses
-  System.Classes,MonteCarlo,UCTree,Tree,DataTypes,BoardControls;
+  {$IFDEF FPC}
+  Classes,
+  {$ELSE}
+  System.Classes,
+  {$ENDIF}
+  MonteCarlo,UCTree,Tree,DataTypes,BoardControls;
 
 type
   TOnThreadFinishedCallBack = procedure(ACaller:TTreeNode<TUCTNode>;APlayouts:Integer;AWhiteWins:Integer;AScoreSum:Double) of object;
