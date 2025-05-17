@@ -2,7 +2,7 @@ unit UCTree;
 
 interface
 uses
-  Tree,DataTypes,System.Math;
+  Tree,DataTypes,{$IFDEF FPC}Math{$ELSE}System.Math{$ENDIF};
 type
   //TODO
   //Choose best move to get childs from !!!!
@@ -116,7 +116,7 @@ end;
         Wins:=ARootNode.Childs[i].Content.GetData.WinsWhite
       else
         Wins:=ARootNode.Childs[i].Content.GetData.WinsBlack;
-      CurWR:=Ply ;//   ... /how to Choose best move for playing?=!=!=!=!=!=!ß?!?=!==!
+      CurWR:=Ply ;//   ... /how to Choose best move for playing?=!=!=!=!=!=!ÃŸ?!?=!==!
       if CurWR>BestWR then
     //  if Ply > ALPHA_AMAF_MINMOVES then
       begin

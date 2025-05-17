@@ -2,10 +2,11 @@ unit Tree;
 
 interface
 uses
-  System.Classes,
-  System.Math,
-  System.Generics.Defaults,
-  System.Generics.Collections;
+  {$IFDEF FPC}
+  Classes, Math, Generics.Defaults, Generics.Collections;
+  {$ELSE}
+  System.Classes, System.Math, System.Generics.Defaults, System.Generics.Collections;
+  {$ENDIF}
 type
   ICompareableData = interface
   ['{C7B36C09-DFE7-4177-8634-7C865FE7FDB6}']
