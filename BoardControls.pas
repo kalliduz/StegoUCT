@@ -56,7 +56,7 @@ threadvar
 implementation
 
 
-uses Math,System.Generics.Collections,Winapi.Windows;
+uses Math,SysUtils;
 
 
 
@@ -356,7 +356,7 @@ end;
    // if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then Exit;
     new(LBoard);
     try
-      MoveMemory(LBoard,apBoard,Sizeof(TBoard));
+      Move(apBoard^, LBoard^, SizeOf(TBoard));
 
        lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
        X:=AX-1;

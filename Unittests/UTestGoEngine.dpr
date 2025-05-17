@@ -1,5 +1,18 @@
 program UTestGoEngine;
 
+{$IFDEF FPC}
+{$mode delphi}{$H+}
+{$IFDEF UNIX}
+  cthreads,
+{$ENDIF}
+uses
+  Classes, SysUtils, fpcunit, testregistry,
+  Test.BoardControls;
+begin
+  RunRegisteredTests;
+end.
+{$ELSE}
+
 {$IFNDEF TESTINSIGHT}
 {$APPTYPE CONSOLE}
 {$ENDIF}{$STRONGLINKTYPES ON}
@@ -57,3 +70,4 @@ begin
       System.Writeln(E.ClassName, ': ', E.Message);
   end;
 end.
+{$ENDIF}

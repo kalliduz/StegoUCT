@@ -1,8 +1,11 @@
 unit DataTypes;
 
 interface
-  uses
-    VCL.Graphics,Classes;
+{$IFDEF FPC}
+  uses Graphics,Classes;
+{$ELSE}
+  uses VCL.Graphics,Classes;
+{$ENDIF}
   const
 
 //////////////////////////////////
