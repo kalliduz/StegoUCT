@@ -9,35 +9,25 @@ unit Test.BoardControls;
 
 }
 interface
+
+{$mode objfpc}{$H+}
+
 uses
-  DUnitX.TestFramework,
+  fpcunit, testregistry, SysUtils,
   DataTypes,
   BoardControls;
 
 type
 
-  [TestFixture]
-  TTestBoardControls = class(TObject)
-  public
-    [Setup]
-    procedure Setup;
-
-    [TearDown]
-    procedure TearDown;
-
-    [Test]
+  TTestBoardControls = class(TTestCase)
+  protected
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
     procedure TestIsSuicide;
-
-    [Test]
     procedure TestReverseColor;
-
-    [Test]
     procedure TestWouldCaptureAnyThing;
-
-    [Test]
     procedure TestCountLiberties;
-
-    [Test]
     procedure TestIsSelfAtari;
   end;
 
@@ -65,13 +55,13 @@ begin
   LY:=1;
   LBoard.PlayerOnTurn:=1;
   LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
-  Assert.IsFalse(LResult);
+  AssertFalse(LResult);
   {
     Now we just set the player as white, and capturing should return true now
   }
   LBoard.PlayerOnTurn:=2;
   LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
-  Assert.IsTrue(LResult);
+  AssertTrue(LResult);
 
   {
     now we fill the board completely white, except for one free eye
@@ -89,14 +79,14 @@ begin
   LY:=2;
   LBoard.PlayerOnTurn:=2;
   LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
-  Assert.IsTrue(LResult);
+  AssertTrue(LResult);
   {
     now we free a second eye for the big white group.
     placing a black stone now won't capture anything
   }
   LBoard.Occupation[4,4]:=0;
   LResult:=WouldCaptureAnyThing(LX,LY,@LBoard);
-  Assert.IsFalse(LResult);
+  AssertFalse(LResult);
 
 end
 
@@ -120,13 +110,13 @@ begin
   Move(LBoard,LCompareBoard,sizeof(TBoard));
 
   LLiberties:=CountLiberties(3,3,@LBoard,false);
-  Assert.AreEqual(6,LLiberties);
+  AssertEquals(6,LLiberties);
 
   {
     since this function is using the actual board for counting,
     we also need to check if no changes were made to the board
   }
-    Assert.AreEqualMemory(@LCompareBoard,@LBoard,sizeof(TBoard));
+  AssertTrue(CompareMem(@LCompareBoard, @LBoard, SizeOf(TBoard)));
 
 
 
@@ -143,7 +133,7 @@ begin
   }
   LBoard.Occupation[1,2]:=1;
   TestResult:=IsSelfAtari(1,1,2,@LBoard);
-  Assert.IsTrue(TestResult);
+  AssertTrue(TestResult);
 
   {
     now we swap the color of the neighbour stone instead
@@ -152,7 +142,7 @@ begin
 
   LBoard.Occupation[1,2]:=2;
   TestResult:=IsSelfAtari(1,1,2,@LBoard);
-  Assert.IsFalse(TestResult);
+  AssertFalse(TestResult);
 
   {
     now we do normal tiger-mouth shape
@@ -164,14 +154,14 @@ begin
   LBoard.Occupation[4,3]:=1;
   LBoard.Occupation[3,4]:=1;
   TestResult:=IsSelfAtari(3,3,2,@LBoard);
-  Assert.IsTrue(TestResult);
+  AssertTrue(TestResult);
 
   {
     now we just set a white stone in the white tigermouth
     should be no selfatari
   }
   TestResult:=IsSelfAtari(3,3,1,@LBoard);
-  Assert.IsFalse(TestResult);
+  AssertFalse(TestResult);
 
 
 end;
@@ -193,12 +183,12 @@ begin
     placing stone in corner, surrounded by two enemies
     Should be suicide.
   }
-  Assert.AreEqual(True,IsSuicide(LX,LY,LColor,@ABoard));
+  AssertEquals(True,IsSuicide(LX,LY,LColor,@ABoard));
   {
     reversing the color should make it a valid move
   }
   LColor:=1;
-  Assert.AreEqual(False,IsSuicide(LX,LY,LColor,@ABoard));
+  AssertEquals(False,IsSuicide(LX,LY,LColor,@ABoard));
 
   {
     and now enemy color again, but we take one of the surrounding stones aways
@@ -206,7 +196,7 @@ begin
   }
   LColor:=2;
   ABoard.Occupation[1,2]:=0;
-  Assert.AreEqual(False,IsSuicide(LX,LY,LColor,@ABoard));
+  AssertEquals(False,IsSuicide(LX,LY,LColor,@ABoard));
 
   {
     now we fill the board with white stones
@@ -223,24 +213,24 @@ begin
   end;
   LColor:=2;
   ABoard.Occupation[1,1]:=0;
-  Assert.AreEqual(False,IsSuicide(LX,LY,LColor,@ABoard));
+  AssertEquals(False,IsSuicide(LX,LY,LColor,@ABoard));
 
   {
     now we attempt to place a white stone on a full board with only one liberty
     this should be a suicide now
   }
   LColor:=1;
-  Assert.AreEqual(True,IsSuicide(LX,LY,LColor,@ABoard));
+  AssertEquals(True,IsSuicide(LX,LY,LColor,@ABoard));
 end;
 
 procedure TTestBoardControls.TestReverseColor;
 begin
-  Assert.AreEqual(1,Integer(ReverseColor(2)));
-  Assert.AreEqual(2,Integer(ReverseColor(1)));
+  AssertEquals(1,Integer(ReverseColor(2)));
+  AssertEquals(2,Integer(ReverseColor(1)));
 end;
 
 
-procedure TTestBoardControls.Setup;
+procedure TTestBoardControls.SetUp;
 begin
 end;
 
@@ -250,5 +240,5 @@ end;
 
 
 initialization
-
+  RegisterTest(TTestBoardControls);
 end.
