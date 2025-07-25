@@ -2,7 +2,12 @@ unit DataTypes;
 
 interface
   uses
-    VCL.Graphics,Classes;
+    Classes;
+
+{$IFDEF FPC}
+  type
+    TColor = Cardinal;
+{$ENDIF}
   const
 
 //////////////////////////////////

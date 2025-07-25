@@ -38,7 +38,7 @@ uses DataTypes,Types;
   //-----------------------------------------------------------
 
   function GetBoardHash(const APBoard:PBoard):Int64;
-   function CountScore(const APBoard:PBoard;const ADynKomi:Double = 0):Double;
+   function CountScore(const APBoard:PBoard;const ADynKomi:Double):Double;
   //-----VALID MOVES NEEDED----------------
 
   function IsKoValidMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
@@ -56,7 +56,7 @@ threadvar
 implementation
 
 
-uses Math,System.Generics.Collections,Winapi.Windows;
+uses Math{$IFDEF MSWINDOWS},Windows{$ENDIF};
 
 
 
@@ -69,43 +69,43 @@ begin
     if a direct neighbour is empty,
     we can directly return true and exit
   }
-  if APBoard.Occupation[AX-1,AY] = 0 then
+  if APBoard^.Occupation[AX-1,AY] = 0 then
     Exit(True);
-  if APBoard.Occupation[AX+1,AY] = 0 then
+  if APBoard^.Occupation[AX+1,AY] = 0 then
     Exit(True);
-  if APBoard.Occupation[AX,AY-1] = 0 then
+  if APBoard^.Occupation[AX,AY-1] = 0 then
     Exit(True);
-  if APBoard.Occupation[AX,AY+1] = 0 then
+  if APBoard^.Occupation[AX,AY+1] = 0 then
     Exit(True);
 
   Result:=False;
-  LCol:=APBoard.Occupation[AX,AY];
+  LCol:=APBoard^.Occupation[AX,AY];
   try
   {
     we mark our current position as already visited
   }
-  APBoard.Occupation[AX,AY] := 254;
+  APBoard^.Occupation[AX,AY] := 254;
 
   {
     now we just check, if any same colored neighbour has
     any liberties and exit directly if so
   }
-  if APBoard.Occupation[AX-1,AY] = LCol then
+  if APBoard^.Occupation[AX-1,AY] = LCol then
     Result:= HasLiberties(AX-1,AY,APBoard);
   if Result then
     Exit(True);
 
-  if APBoard.Occupation[AX+1,AY] = LCol then
+  if APBoard^.Occupation[AX+1,AY] = LCol then
     Result:= HasLiberties(AX+1,AY,APBoard);
   if Result then
     Exit(True);
 
-  if APBoard.Occupation[AX,AY-1] = LCol then
+  if APBoard^.Occupation[AX,AY-1] = LCol then
     Result:= HasLiberties(AX,AY-1,APBoard);
   if Result then
     Exit(True);
 
-  if APBoard.Occupation[AX,AY+1] = LCol then
+  if APBoard^.Occupation[AX,AY+1] = LCol then
     Result:= HasLiberties(AX,AY+1,APBoard);
   if Result then
     Exit(True);
@@ -115,7 +115,7 @@ begin
       so we can exit inside the try block and avoid a lot of
       if then logic
     }
-    APBoard.Occupation[AX,AY] := LCol;
+    APBoard^.Occupation[AX,AY] := LCol;
   end;
 
 
@@ -125,7 +125,7 @@ var LCol:SmallInt;
 function IsInAtari(X,Y:SmallInt):Boolean;
 begin
   Result:=False;
-  if APBoard.Occupation[X,Y] <> LCol then
+  if APBoard^.Occupation[X,Y] <> LCol then
     Exit;
   Result:= CountLiberties(X,Y,APBoard,True)=1;
 end;
@@ -137,7 +137,7 @@ begin
   return TRUE, if one of these liberties is 1,
   because placing the stone would reduce it to 0
 }
-  LCol:=ReverseColor(APBoard.PlayerOnTurn);
+  LCol:=ReverseColor(APBoard^.PlayerOnTurn);
   Result:=False;
   if IsInAtari(AX,AY-1) then
     Exit(True);
@@ -156,7 +156,7 @@ begin
   Result:=0;
   if AStopAfterTwo and (LRecursionCounter>= 2) then
     Exit;
-  if APBoard.Occupation[X,Y] = AMatchColor then
+  if APBoard^.Occupation[X,Y] = AMatchColor then
   begin
     Result:=Result+CountLibertiesRecursive(X,Y,APBoard,AMatchColor,AStopAfterTwo);
     {
@@ -164,12 +164,12 @@ begin
     }
   end else
   begin
-    if APBoard.Occupation[X,Y] = 0 then
+    if APBoard^.Occupation[X,Y] = 0 then
     begin
       {
         if the field is empty, its a group liberty, so we count and mark it
       }
-      APBoard.Occupation[X,Y] := 254; //so now 0 fields are 254
+      APBoard^.Occupation[X,Y] := 254; //so now 0 fields are 254
       Inc(Result);
       Inc(LRecursionCounter);
      {
@@ -185,7 +185,7 @@ function CountLibertiesRecursive(const AX,AY:SmallInt;const APBoard:PBoard;const
 
 begin
   Result:=0;
-  if APBoard.Occupation[AX,AY]=0 then
+  if APBoard^.Occupation[AX,AY]=0 then
     Exit;
   if ((AStopAfterTwo) AND (LRecursionCounter >= 2)) then
     Exit;
@@ -195,7 +195,7 @@ begin
     Also we add him to the cleanup list for later
   }
 
-  APBoard.Occupation[AX,AY]:=3;
+  APBoard^.Occupation[AX,AY]:=3;
   GMarkedStones[GStoneIndex]:=Point(AX,AY);
   inc(GStoneIndex);
 
@@ -229,17 +229,17 @@ begin
 
 
     try
-      LCol:=APBoard.Occupation[AX,AY];
+      LCol:=APBoard^.Occupation[AX,AY];
       Result:= CountLibertiesRecursive(AX,AY,APBoard,LCol,AStopAfterTwo);
     finally
       {
         we remembered all the marked stones and liberties, so we can cleanup them now
       }
       for i  := 0 to GStoneIndex-1 do
-        APBoard.Occupation[GMarkedStones[i].X,GMarkedStones[i].Y]:=LCol;
+        APBoard^.Occupation[GMarkedStones[i].X,GMarkedStones[i].Y]:=LCol;
 
       for i := 0 to GLibertyIndex-1 do
-        APBoard.Occupation[GMarkedLiberties[i].X,GMarkedLiberties[i].Y]:=0;
+        APBoard^.Occupation[GMarkedLiberties[i].X,GMarkedLiberties[i].Y]:=0;
 
 
     end;
@@ -255,15 +255,15 @@ end;
     i,j:Integer;
   procedure AddMarkAndExtendRect(const X,Y:SmallInt);
   begin
-    if LBoard.Occupation[X,Y] = 0 then
+    if LBoard^.Occupation[X,Y] = 0 then
     begin
-      LBoard.Occupation[X,Y]:=254; //liberty marker
+      LBoard^.Occupation[X,Y]:=254; //liberty marker
     end else
     begin
-      if LBoard.Occupation[X,Y] = LCol then
+      if LBoard^.Occupation[X,Y] = LCol then
       begin
         LMarked:=True;
-        LBoard.Occupation[X,Y]:=255;
+        LBoard^.Occupation[X,Y]:=255;
         //expanding the rectangle
         if X<LLeft then
           LLeft:=X;
@@ -286,13 +286,13 @@ end;
     if AY>BOARD_SIZE then exit;
     //we work on a copy of the board because it's faster than cleaning up the real board
     New(LBoard);
-    CopyMemory(LBoard,APBoard,sizeof(APBoard^));
+    Move(APBoard^,LBoard^,SizeOf(TBoard));
 
     //next step: save the color for comparison
-    LCol:=LBoard.Occupation[AX,AY];
+    LCol:=LBoard^.Occupation[AX,AY];
 
     //now we mark the initial stone and set the initial search boundaries
-    LBoard.Occupation[AX,AY]:=255; //this is our stone marker
+    LBoard^.Occupation[AX,AY]:=255; //this is our stone marker
     LTop:=AY;LDown:=AY;
     LLeft:=AX;LRight:=AX;
 
@@ -313,7 +313,7 @@ end;
         for j := LTop to LDown do
         begin
           //these procedures are setting the LMarked flag!
-          if LBoard.Occupation[i,j] = 255 then
+          if LBoard^.Occupation[i,j] = 255 then
           begin
             AddMarkAndExtendRect(i-1,j);
             AddMarkAndExtendRect(i+1,j);
@@ -335,7 +335,7 @@ end;
     begin
       for j := LTop-1 to LDown+1 do
       begin
-         if LBoard.Occupation[i,j] = 254 then
+         if LBoard^.Occupation[i,j] = 254 then
           inc(Result);
       end;
     end;
@@ -353,12 +353,12 @@ end;
   begin
 
     Result:=0;
-   // if not IsValidMove(Ax,AY,APBoard.PlayerOnTurn,APBoard) then Exit;
+   // if not IsValidMove(Ax,AY,APBoard^.PlayerOnTurn,APBoard) then Exit;
     new(LBoard);
     try
-      MoveMemory(LBoard,apBoard,Sizeof(TBoard));
+      Move(APBoard^,LBoard^,SizeOf(TBoard));
 
-       lBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
+       lBoard^.Occupation[AX,AY]:=APBoard^.PlayerOnTurn;
        X:=AX-1;
        Y:=AY;
      // if CountLibertiesRec(X,Y,@lBoard,True,@lMarkList,lLen,True)= 0 then
@@ -399,18 +399,18 @@ end;
    function WouldCaptureLastMove(const AX,AY:SmallInt;const APBoard:PBoard):Boolean;
    var lMarkList:TMarkList;lLen:SmallInt; LOccup:SmallInt;
    begin
-    if (APBoard.LastMoveCoordX = 0) AND ( APboard.LastMoveCoordY = 0) then
+    if (APBoard^.LastMoveCoordX = 0) AND ( APBoard^.LastMoveCoordY = 0) then
       Exit(False);
 
     Result:=False;
 
-      LOccup:=APBoard.Occupation[AX,AY];
-      APBoard.Occupation[AX,AY]:=APBoard.PlayerOnTurn;
-      if CountLiberties(APBoard.LastMoveCoordX,APBoard.LastMoveCoordY,APBoard,True)=0 then
+      LOccup:=APBoard^.Occupation[AX,AY];
+      APBoard^.Occupation[AX,AY]:=APBoard^.PlayerOnTurn;
+      if CountLiberties(APBoard^.LastMoveCoordX,APBoard^.LastMoveCoordY,APBoard,True)=0 then
       begin
         Result:=True;
       end;
-      APBoard.Occupation[AX,AY]:=LOccup;
+      APBoard^.Occupation[AX,AY]:=LOccup;
 
 
    end;
@@ -422,9 +422,9 @@ end;
       try
         if WouldCaptureLastMove(AX,AY,APBoard) then Exit; //no self atari if capture....
 
-        if APBoard.Occupation[AX,AY]=0 then
+        if APBoard^.Occupation[AX,AY]=0 then
         begin
-         APBoard.Occupation[AX,AY]:=AColor;
+         APBoard^.Occupation[AX,AY]:=AColor;
          LWasEmpty:=True;
         end;
         if CountLiberties(AX,AY,APBoard,True)<2 then
@@ -433,7 +433,7 @@ end;
 
         end;
         if LWasEmpty then
-          APBoard.Occupation[AX,AY]:=0;
+          APBoard^.Occupation[AX,AY]:=0;
       finally
       end;
 
@@ -448,16 +448,16 @@ end;
       begin
         for j := 1 to BOARD_SIZE do
         begin
-          APRatingTable.RatingAt[i][j].Valid:=IsValidMove(i,j,APBoard.PlayerOnTurn,APBoard);
-          APRatingTable.RatingAt[i][j].WinsWhite:=0;
-          APRatingTable.RatingAt[i][j].WinsBlack:=0;
-          APRatingTable.RatingAt[i][j].MovesDone:=0;
+          APRatingTable^.RatingAt[i][j].Valid:=IsValidMove(i,j,APBoard^.PlayerOnTurn,APBoard);
+          APRatingTable^.RatingAt[i][j].WinsWhite:=0;
+          APRatingTable^.RatingAt[i][j].WinsBlack:=0;
+          APRatingTable^.RatingAt[i][j].MovesDone:=0;
 
         end;
       end;
-      APRatingTable.RatingPass.Valid:=True;
-      APRatingTable.RatingPass.WinsWhite:=0;
-      APRatingTable.RatingPass.WinsBlack:=0;
+      APRatingTable^.RatingPass.Valid:=True;
+      APRatingTable^.RatingPass.WinsWhite:=0;
+      APRatingTable^.RatingPass.WinsBlack:=0;
     end;
 
     procedure CleanMoveList(const APBoard:PBoard;const AColor:SmallInt; const MoveList:PMoveList);
@@ -491,26 +491,26 @@ end;
     if APBoard^.Occupation[AX,AY]=254 then exit;  //marker for already "touched" stones
     //----MARK AND COUNT LIBERTIES-----
      if IsEqualField(AX-1,AY,0, APBoard) then
-//     if APBoard.Occupation[AX-1,AY]=0 then
+//     if APBoard^.Occupation[AX-1,AY]=0 then
      begin
 
       Result:=True;
       Exit;
      end;
      if IsEqualField(AX+1,AY,0, APBoard) then
-//     if APBoard.Occupation[AX+1,AY]=0 then
+//     if APBoard^.Occupation[AX+1,AY]=0 then
      begin
       Result:=True;
       Exit;
      end;
      if IsEqualField(AX,AY-1,0, APBoard) then
-//     if APBoard.Occupation[AX,AY-1]=0 then
+//     if APBoard^.Occupation[AX,AY-1]=0 then
      begin
      Result:=True;
      Exit;
      end;
      if IsEqualField(AX,AY+1,0, APBoard) then
-//     if APBoard.Occupation[AX,AY+1]=0 then
+//     if APBoard^.Occupation[AX,AY+1]=0 then
      begin
       Result:=True;
       Exit;
@@ -520,25 +520,25 @@ end;
     APBoard^.Occupation[AX,AY]:=254; //marker nr. 2, preventing stackoverflow in counting (infinite recursion)
     //---SUM UP RECURSIVELY------------
      if IsEqualField(AX-1,AY,memFlag, APBoard) then
-//   if APBoard.Occupation[AX-1,AY]=memFlag then
+//   if APBoard^.Occupation[AX-1,AY]=memFlag then
      begin
       Result:=HasLiberties_(AX-1,AY,APBoard,False);
      end;
 
      if IsEqualField(AX+1,AY,memFlag, APBoard) then if not Result then
-//     if APBoard.Occupation[AX+1,AY]=memFlag then
+//     if APBoard^.Occupation[AX+1,AY]=memFlag then
      begin
       Result:= HasLiberties_(AX+1,AY,APBoard,False);
      end;
 
      if IsEqualField(AX,AY-1,memFlag, APBoard) then   if not Result then
-//  if APBoard.Occupation[AX,AY-1]=memFlag then
+//  if APBoard^.Occupation[AX,AY-1]=memFlag then
      begin
       Result:=HasLiberties_(AX,AY-1,APBoard,False);
      end;
 
      if IsEqualField(AX,AY+1,memFlag, APBoard) then  if not Result then
-//    if APBoard.Occupation[AX,AY+1]=memFlag then
+//    if APBoard^.Occupation[AX,AY+1]=memFlag then
      begin
       Result:=HasLiberties_(AX,AY+1,APBoard,False);
      end;
@@ -562,20 +562,20 @@ end;
  begin
     Result := True;
 //    if IsEqualField(Ax-1,AY,1,APBoard) then exit;
-     if APBoard.Occupation[AX-1,AY]=1 then  Exit;
-      if APBoard.Occupation[AX-1,AY]=2 then Exit;
+     if APBoard^.Occupation[AX-1,AY]=1 then  Exit;
+      if APBoard^.Occupation[AX-1,AY]=2 then Exit;
 
 //    if IsEqualField(Ax-1,AY,2,APBoard) then exit;
-         if APBoard.Occupation[AX+1,AY]=1 then  Exit;
-      if APBoard.Occupation[AX+1,AY]=2 then Exit;
+         if APBoard^.Occupation[AX+1,AY]=1 then  Exit;
+      if APBoard^.Occupation[AX+1,AY]=2 then Exit;
 //    if IsEqualField(Ax+1,AY,1,APBoard) then exit;
 //    if IsEqualField(Ax+1,AY,2,APBoard) then exit;
-        if APBoard.Occupation[AX,AY-1]=1 then  Exit;
-      if APBoard.Occupation[AX,AY-1]=2 then Exit;
+        if APBoard^.Occupation[AX,AY-1]=1 then  Exit;
+      if APBoard^.Occupation[AX,AY-1]=2 then Exit;
 //    if IsEqualField(Ax,AY-1,1,APBoard) then exit;
 //    if IsEqualField(Ax,AY-1,2,APBoard) then exit;
-      if APBoard.Occupation[AX,AY+1]=1 then  Exit;
-      if APBoard.Occupation[AX,AY+1]=2 then Exit;
+      if APBoard^.Occupation[AX,AY+1]=1 then  Exit;
+      if APBoard^.Occupation[AX,AY+1]=2 then Exit;
 //    if IsEqualField(Ax,AY+1,1,APBoard) then exit;
 //    if IsEqualField(Ax,AY+1,2,APBoard) then exit;
     Result:=False;
@@ -623,8 +623,10 @@ end;
   function HasReasonableMoves(const APBoard:PBoard;const AColor:SmallInt):Boolean;
   var i,j:Integer;
   begin
-    Result:=True;
-    for i := 1 to BOARD_SIZE do for j := 1 to BOARD_SIZE do (If IsReasonableMove(i,j,APBoard,Acolor) then Exit);
+    for i := 1 to BOARD_SIZE do
+      for j := 1 to BOARD_SIZE do
+        if IsReasonableMove(i,j,APBoard,AColor) then
+          Exit(True);
     Result:=False;
   end;
 
@@ -707,7 +709,7 @@ end;
 //              +(APBoard^.RemovedStones[2]) // captured black stones removed from black points, added to white points
             //  +Stones    //White Stones in the game
 //              -(APBoard^.RemovedStones[1]); // captured white stones removed from white points, added to black points
-//      Result:=Result+ApBOard.RemovedStones[2]-ApBoard.RemovedStones[1];
+//      Result:=Result+APBoard^.RemovedStones[2]-APBoard^.RemovedStones[1];
      for i := 1 to BOARD_SIZE do
      begin
        for j := 1 to BOARD_SIZE do
@@ -745,10 +747,10 @@ end;
     for i := 1 to BOARD_SIZE do for j := 1 to BOARD_SIZE do APBoard^.Occupation[i,j]:=0;
     for i := 0 to BOARD_SIZE+1 do
     begin
-      APBoard.Occupation[i,0]:=111; //no color but no liberty either..., walldummy
-      APBoard.Occupation[i,BOARD_SIZE+1]:=111;
-      APBoard.Occupation[0,i]:=111;
-      APBoard.Occupation[BOARD_SIZE+1,i]:=111;
+      APBoard^.Occupation[i,0]:=111; //no color but no liberty either..., walldummy
+      APBoard^.Occupation[i,BOARD_SIZE+1]:=111;
+      APBoard^.Occupation[0,i]:=111;
+      APBoard^.Occupation[BOARD_SIZE+1,i]:=111;
     end;
     APBoard^.LastMoveCatchedExactlyOne:=false;
     APBoard^.PlayerOnTurn:=2;
@@ -756,8 +758,8 @@ end;
     APBoard^.Over:=False;
     APBoard^.RemovedStones[1]:=0;
     APBoard^.RemovedStones[2]:=0;
-    APBoard.LastMoveCoordX:=0;
-    APBoard.LastMoveCoordY:=0;
+    APBoard^.LastMoveCoordX:=0;
+    APBoard^.LastMoveCoordY:=0;
    end;
   function ExecuteMove(const AX,AY,AColor:SmallInt;const APBoard:PBoard;const ANullMove:Boolean;const AFastMode:Boolean):Boolean;
   var enemyColor:SmallInt;RemCount:SmallInt;
@@ -776,11 +778,11 @@ end;
       Exit(False);
     if ANullMove or ((AX = 0) AND (AY=0)) then
     begin
-      APBoard.LastMoveCatchedExactlyOne:=False;
+      APBoard^.LastMoveCatchedExactlyOne:=False;
       if APBoard^.LastPlayerPassed then
       begin
         APBoard^.Over:=True;
-        APBoard.LastMoveCatchedExactlyOne:=False;
+        APBoard^.LastMoveCatchedExactlyOne:=False;
         if APBoard^.PlayerOnTurn=1 then APBoard^.PlayerOnTurn:=2 else APBoard^.PlayerOnTurn:=1;
         Result := True;
         Exit;
@@ -880,10 +882,10 @@ end;
   begin
     Result := False;
     //---OBVIOUS FIRST, CHECK FOR LIBERTIES----
-    if APBoard.Occupation[AX-1,AY]=0 then Exit;
-     if APBoard.Occupation[AX+1,AY]=0 then Exit;
-      if APBoard.Occupation[AX,AY-1]=0 then Exit;
-       if APBoard.Occupation[AX,AY+1]=0 then Exit;
+    if APBoard^.Occupation[AX-1,AY]=0 then Exit;
+     if APBoard^.Occupation[AX+1,AY]=0 then Exit;
+      if APBoard^.Occupation[AX,AY-1]=0 then Exit;
+       if APBoard^.Occupation[AX,AY+1]=0 then Exit;
 //    If IsEqualField(AX-1,AY,0,APBoard) then Exit;
 //    If IsEqualField(AX+1,AY,0,APBoard) then Exit;
 //    If IsEqualField(AX,AY-1,0,APBoard) then Exit;
@@ -892,25 +894,25 @@ end;
     //----NOW CHECK FOR CAPTURE--------
       enemyColor:=ReverseColor(AColor);
 //      If IsEqualField(AX-1,AY,enemyColor,APBoard) then
-     if APBoard.Occupation[AX-1,AY]=enemyColor then
+     if APBoard^.Occupation[AX-1,AY]=enemyColor then
       begin
 //        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
         if CountLiberties(AX-1,AY,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX+1,AY,enemyColor,APBoard) then
-     if APBoard.Occupation[AX+1,AY]=enemyColor then
+     if APBoard^.Occupation[AX+1,AY]=enemyColor then
       begin
 //        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
           if CountLiberties(AX+1,AY,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX,AY-1,enemyColor,APBoard) then
-   if APBoard.Occupation[AX,AY-1]=enemyColor then
+   if APBoard^.Occupation[AX,AY-1]=enemyColor then
       begin
 //        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
         if CountLiberties(AX,AY-1,APBoard,True) = 1 then Exit;
       end;
 //      If IsEqualField(AX,AY+1,enemyColor,APBoard) then
-    if APBoard.Occupation[AX,AY+1]=enemyColor then
+    if APBoard^.Occupation[AX,AY+1]=enemyColor then
       begin
 //        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)=1 then Exit;
         if CountLiberties(AX,AY+1,APBoard,True) = 1 then Exit;
@@ -918,25 +920,25 @@ end;
     //---------------------------------
     //----NOW CHECK FOR OWN GROUP LIBERTIES----------
 //      If IsEqualField(AX-1,AY,AColor,APBoard) then
-   if APBoard.Occupation[AX-1,AY]=AColor then
+   if APBoard^.Occupation[AX-1,AY]=AColor then
       begin
 //        If CountLibertiesRec(AX-1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
         if CountLiberties(AX-1,AY,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX+1,AY,AColor,APBoard) then
-      if APBoard.Occupation[AX+1,AY]=AColor then
+      if APBoard^.Occupation[AX+1,AY]=AColor then
       begin
 //        If CountLibertiesRec(AX+1,AY,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
         if CountLiberties(AX+1,AY,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX,AY-1,AColor,APBoard) then
-      if APBoard.Occupation[AX,AY-1]=AColor then
+      if APBoard^.Occupation[AX,AY-1]=AColor then
       begin
 //        If CountLibertiesRec(AX,AY-1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
         if CountLiberties(AX,AY-1,APBoard,True) > 1 then Exit;
       end;
 //      If IsEqualField(AX,AY+1,AColor,APBoard) then
-    if APBoard.Occupation[AX,AY+1]=AColor then
+    if APBoard^.Occupation[AX,AY+1]=AColor then
       begin
 //        If CountLibertiesRec(AX,AY+1,APBoard,True,@lMarkedFields,lLen,True)>1 then Exit;
           if CountLiberties(AX,AY+1,APBoard,True) > 1 then Exit;
@@ -995,7 +997,7 @@ end;
     if AY=0 then begin Result:=False; end else
     if AX>(BOARD_SIZE) then begin Result:=False; end else
     if AY>(BOARD_SIZE) then begin Result:=False; end else   }
-    if (APBoard.Occupation[AX,AY] <> AOccupation) then result:=False else Result:=True;
+    if (APBoard^.Occupation[AX,AY] <> AOccupation) then result:=False else Result:=True;
   end;
 
   function CountLibertiesRec_(const AX,AY:SmallInt;const APBoard:PBoard;const AFirstCall:Boolean;const MarkedFields:PMarkList;var ALen:SmallInt;const AStopAfterTwo:Boolean):SmallInt;
@@ -1009,8 +1011,8 @@ end;
     if AFirstCall then
     begin
       //do a snapshot of the board
-      P:=GetMemory(SizeOf(APBoard^));
-      CopyMemory(P,APBoard,SizeOf(ApBoard^));
+      P:=GetMemory(SizeOf(TBoard));
+      Move(APBoard^,P^,SizeOf(TBoard));
     end;
     //Size of the Group is not important for counting liberties, so only mark liberties here
     if AX=0 then exit;
@@ -1023,47 +1025,47 @@ end;
     //----MARK AND COUNT LIBERTIES-----
     // if IsEqualField(AX-1,AY,0, APBoard) then
 
-    if APBoard.Occupation[AX-1,AY]=0 then
+    if APBoard^.Occupation[AX-1,AY]=0 then
      begin
       APBoard^.Occupation[AX-1,AY]:=255;
 
       inc(ALen);
-      MarkedFields[Alen][1]:=AX-1;
-      MarkedFields[Alen][2]:=AY;
+      MarkedFields^[Alen][1]:=AX-1;
+      MarkedFields^[Alen][2]:=AY;
 
       inc(Result);
      end;
    //  if IsEqualField(AX+1,AY,0, APBoard) then
-   if APBoard.Occupation[AX+1,AY]= 0 then
+   if APBoard^.Occupation[AX+1,AY]= 0 then
      begin
       APBoard^.Occupation[AX+1,AY]:=255;
 
       inc(ALen);
-      MarkedFields[ALen][1]:=AX+1;
-      MarkedFields[ALen][2]:=AY;
+      MarkedFields^[ALen][1]:=AX+1;
+      MarkedFields^[ALen][2]:=AY;
 
       inc(Result);
      end;
     // if IsEqualField(AX,AY-1,0, APBoard) then
-    if APBoard.Occupation[AX,AY-1]=0 then
+    if APBoard^.Occupation[AX,AY-1]=0 then
      begin
      APBoard^.Occupation[AX,AY-1]:=255;
 
       inc(ALen);
-      MarkedFields[ALen][1]:=AX;
-      MarkedFields[Alen][2]:=AY-1;
+      MarkedFields^[ALen][1]:=AX;
+      MarkedFields^[Alen][2]:=AY-1;
 
 
       inc(Result);
      end;
 //     if IsEqualField(AX,AY+1,0, APBoard) then
-     if APBoard.Occupation[AX,AY+1]=0 then
+     if APBoard^.Occupation[AX,AY+1]=0 then
      begin
      APBoard^.Occupation[AX,AY+1]:=255;
 
        inc(ALen);
-      MarkedFields[Alen][1]:=AX;
-      MarkedFields[Alen][2]:=AY+1;
+      MarkedFields^[Alen][1]:=AX;
+      MarkedFields^[Alen][2]:=AY+1;
 
 
       inc(Result);
@@ -1079,14 +1081,14 @@ end;
 
           APBoard^.Occupation[AX,AY]:=254; //marker nr. 2, preventing stackoverflow in counting (infinite recursion)
              inc(ALen);
-         MarkedFields[ALen][1]:=AX;
-         MarkedFields[ALen][2]:=AY;
+         MarkedFields^[ALen][1]:=AX;
+         MarkedFields^[ALen][2]:=AY;
 
           //---SUM UP RECURSIVELY------------
       //     if IsEqualField(AX-1,AY,memFlag, APBoard) then
            if not (AStopAfterTwo and(Result>1)) then
            begin
-               if APBoard.Occupation[AX-1,AY]=memFlag then
+               if APBoard^.Occupation[AX-1,AY]=memFlag then
                begin
 
 
@@ -1096,7 +1098,7 @@ end;
            if not (AStopAfterTwo and(Result>1)) then
            begin
         //     if IsEqualField(AX+1,AY,memFlag, APBoard) then
-             if APBoard.Occupation[AX+1,AY]=memFlag then
+             if APBoard^.Occupation[AX+1,AY]=memFlag then
              begin
 
 
@@ -1106,7 +1108,7 @@ end;
       //     if IsEqualField(AX,AY-1,memFlag, APBoard) then
            if not (AStopAfterTwo and(Result>1)) then
            begin
-             if APBoard.Occupation[AX,AY-1]=memFlag then
+             if APBoard^.Occupation[AX,AY-1]=memFlag then
                begin
 
 
@@ -1116,7 +1118,7 @@ end;
       //     if IsEqualField(AX,AY+1,memFlag, APBoard) then
            if not (AStopAfterTwo and(Result>1)) then
            begin
-              if APBoard.Occupation[AX,AY+1]=memFlag then
+              if APBoard^.Occupation[AX,AY+1]=memFlag then
                begin
 
 
@@ -1128,8 +1130,8 @@ end;
     //--CLEAN UP THE MARKERS------------
     if AFirstCall then  // only after every recursion stopped we want to unmark
     begin
-      CopyMemory(APBoard,P,sizeof(APBoard^));  //replace the used board with the snapshot
-      Dispose(P);
+      Move(P^,APBoard^,SizeOf(TBoard));  //replace the used board with the snapshot
+      FreeMem(P);
     end;
 
     //----------------------------------
